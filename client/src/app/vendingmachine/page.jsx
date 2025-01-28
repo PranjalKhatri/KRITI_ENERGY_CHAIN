@@ -1,8 +1,28 @@
 "use client";
+
+import {useState,useEffect} from 'react';
 import Web3 from "web3";
+import vmContract from '../../../blockchain/firstcontract';
 
 export default function VendingMachine() {
-    let web3;
+  const [error, setError] = useState('');
+  const [inventory, setInventory] = useState('');
+  
+  useEffect(()=>{
+    getInventoryHandler();
+  },[]);
+
+  const getInventoryHandler=()=>{
+    try{
+    const inventory = vmContract.methods.message().call();
+    setInventory(inventory);
+    console.log(inventory);
+    }catch(err){
+      console.err(err.message);
+      setError(err.message);
+    }
+  };
+
     const connectWalletHandler = async ()=>{
         if(typeof window !== "undefined" && typeof window.ethereum !== "undefined"){
             try {
@@ -11,7 +31,7 @@ export default function VendingMachine() {
                 const account = accounts[0];
                 console.log(account);
             } catch (err) {
-                console.log(err);
+                setError(err.message);
             }
         }else{
             console.log("Please install metamask");
@@ -29,7 +49,10 @@ export default function VendingMachine() {
         </button>
       </nav>
       <section>
-        
+        <div className="container">
+          <h2> Vending Machine inventory: {inventory} </h2>
+        {error && <p className="text-red-500 mt-4">{error}</p>}
+        </div>
       </section>
     </div>
   );

@@ -1,15 +1,20 @@
 {
-  "name": "vending-machine",
+  "name": "sepolia-testnet-deployment",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "keywords": [],
   "author": "",
   "license": "ISC",
+  "devDependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.2.3",
+    "ethers": "^5.0.0",
+    "hardhat": "^2.22.18"
+  },
   "dependencies": {
-    "@truffle/hdwallet-provider": "^2.1.15",
     "dotenv": "^16.4.7"
   }
 }
