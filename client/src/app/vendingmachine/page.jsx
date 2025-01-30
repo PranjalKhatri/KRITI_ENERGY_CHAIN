@@ -2,24 +2,53 @@
 
 import { useState, useEffect } from "react";
 import Web3 from "web3";
+import { Wallet, Battery, BatteryCharging, ArrowRightLeft } from "lucide-react";
+import { Alert, AlertDescription } from "../../components/alert";
 import vmContract from "../../../blockchain/firstcontract";
 import closebid from "../../../blockchain/closebid";
 
 export default function VendingMachine() {
+  // ... [previous state declarations remain the same]
   const [error, setError] = useState("");
+  const [errorProgress, setErrorProgress] = useState(100);
   const [inventory, setInventory] = useState("");
-  const [amount, setAmount] = useState(0);
-  const [role, setRole] = useState("buyer");
-  const [bidAmount, setBidAmount] = useState("");
-  const [buyAmount, setBuyAmount] = useState("");
-  const [sellPrice, setSellPrice] = useState("");
-  const [sellAmount, setSellAmount] = useState("");
+  const [role, setRole] = useState(null);
   const [web3, setWeb3] = useState(null);
   const [account, setAccount] = useState(null);
-
+  const [buyAmount, setBuyAmount] = useState("");
+  const [bidAmount, setBidAmount] = useState("");
+  const [sellPrice, setSellPrice] = useState("");
+  const [sellAmount, setSellAmount] = useState("");
+  const [lastBid, setLastBid] = useState(null);
+  const [totalBids, setTotalBids] = useState({ count: 0, volume: 0 });
+  // ... [previous useEffect and handlers remain the same]
   useEffect(() => {
     getInventoryHandler();
   }, []);
+// Error handling with auto-dismiss
+useEffect(() => {
+  if (error) {
+    const duration = 5000; // 5 seconds
+    const interval = 50; // Update every 50ms
+    const steps = duration / interval;
+    let progress = 100;
+
+    const timer = setInterval(() => {
+      progress -= 100 / steps;
+      setErrorProgress(Math.max(0, progress));
+
+      if (progress <= 0) {
+        clearInterval(timer);
+        setError("");
+        setErrorProgress(100);
+      }
+    }, interval);
+
+    return () => {
+      clearInterval(timer);
+    };
+  }
+}, [error]);
 
   const getInventoryHandler = async () => {
     try {
@@ -35,27 +64,20 @@ export default function VendingMachine() {
   const connectWalletHandler = async () => {
     if (typeof window.ethereum !== "undefined") {
       try {
-        const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-  
-        // Initialize web3 instance after successful account request
+        const accounts = await window.ethereum.request({
+          method: "eth_requestAccounts",
+        });
         const web3Instance = new Web3(window.ethereum);
         setWeb3(web3Instance);
-  
         const account = accounts[0];
         setAccount(account);
-        console.log("Connected to account:", account);
-  
-        // Verify that you're on the Sepolia network
+
         const networkId = await web3Instance.eth.net.getId();
-        console.log("Connected to network ID:", networkId);
-        
         if (networkId !== 11155111n) {
-          console.log("Please connect to Sepolia network.");
+          setError("Please connect to Sepolia network.");
           return;
-        } else {
-          console.log("You're connected to Sepolia!");
         }
-  
+        console.log("Account connected: ", account);
       } catch (err) {
         console.error("Error connecting to wallet:", err);
         setError(err.message);
@@ -64,35 +86,31 @@ export default function VendingMachine() {
       setError("Please install MetaMask.");
     }
   };
-  
 
   async function placeBid(amount, price, isProducer) {
     if (!web3 || !account) {
-      console.error("Web3 or account not initialized. Please connect your wallet.");
       setError("Web3 or account not initialized. Please connect your wallet.");
       return;
     }
-  
-    console.log(await web3.eth.net.getId());
-    console.log("Placing bid:", amount, price, isProducer);
-  
+
     try {
       const accounts = await web3.eth.getAccounts();
       const account = accounts[0];
-  
-      // Manually create the transaction object
+
       const transaction = {
         from: account,
-        to: closebid.options.address, // Contract address
+        to: closebid.options.address,
         data: closebid.methods
           .placeBid(parseInt(amount), parseInt(price), Boolean(isProducer))
-          .encodeABI(), // Encodes the data for the transaction
-        gas: 1000000, // Adjust gas limit if needed
+          .encodeABI(),
+        gas: 1000000,
       };
-  
-      // Send the transaction using web3.eth.sendTransaction
+
       const result = await web3.eth.sendTransaction(transaction);
       
+      setLastBid({ amount, price, timestamp: new Date().toLocaleString() });
+      setTotalBids(prev => ({ count: prev.count + 1, volume: prev.volume + parseInt(amount) }));
+
       console.log("Bid placed successfully:", result);
       return result;
     } catch (error) {
@@ -100,147 +118,232 @@ export default function VendingMachine() {
       setError(error.message);
     }
   }
-  
 
-  const bidAmountHandler = async () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     try {
-      if (!web3) {
-        console.error("Web3 not initialized. Please connect your wallet.");
-        return;
+      if (role === "buyer") {
+        await placeBid(buyAmount, bidAmount, false);
+      } else {
+        await placeBid(sellAmount, sellPrice, true);
       }
-      const consumers = await closebid.methods.getConsumers().call();
-      const bidContract = await placeBid(buyAmount, bidAmount, false);
-      console.log("Bid contract:", bidContract);
-      console.log("Consumers:", consumers);
+      await getInventoryHandler();
     } catch (err) {
       console.error(err.message);
       setError(err.message);
     }
   };
-  const sellAmountHandler = async () => {
-    try {
-      if (!web3) {
-        console.error("Web3 not initialized. Please connect your wallet.");
-        return;
-      }
-      if (!sellAmount || !sellPrice) {
-        setError("Please fill in both amount and price to sell.");
-        return;
-      }
-      // Call smart contract method for selling
-      const sellerContract = await placeBid(sellAmount, sellPrice, true);
-  
-      console.log("Sell successful:", sellerContract);
-      // Update the inventory or perform any other necessary actions
-      await getInventoryHandler();  // To refresh inventory after the sale
-  
-    } catch (err) {
-      console.error("Error selling amount:", err);
-      setError(err.message);
-    }
-  };
-  
+
+  const BidHistory = () => (
+    <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+        Trading History
+      </h3>
+      <div className="grid grid-cols-2 gap-6">
+        <div className="space-y-2">
+          <div className="flex items-center space-x-2">
+            <History className="h-5 w-5 text-blue-500" />
+            <span className="text-sm font-medium text-gray-700">Last Bid</span>
+          </div>
+          <div className="bg-blue-50 rounded-lg p-4">
+            <div className="text-sm text-gray-600">
+              Amount: {lastBid.amount} kWh
+            </div>
+            <div className="text-sm text-gray-600">
+              Price: {lastBid.price} ETH/kWh
+            </div>
+            <div className="text-xs text-gray-500">{lastBid.timestamp}</div>
+          </div>
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center space-x-2">
+            <Coins className="h-5 w-5 text-green-500" />
+            <span className="text-sm font-medium text-gray-700">
+              Total Trading Activity
+            </span>
+          </div>
+          <div className="bg-green-50 rounded-lg p-4">
+            <div className="text-sm text-gray-600">
+              Total Bids: {totalBids.count}
+            </div>
+            <div className="text-sm text-gray-600">
+              Volume: {totalBids.volume} kWh
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <nav className="navbar flex justify-between p-4 bg-gray-800">
-        <div>
-          <h2 className="text-3xl text-green-500 font-bold">Vending Machine</h2>
-        </div>
-        <button
-          onClick={connectWalletHandler}
-          className="bg-green-600 text-white px-6 py-3 rounded-lg text-lg hover:bg-green-700 transition duration-300"
-        >
-          Connect to Wallet
-        </button>
-      </nav>
-
-      <section className="flex flex-col items-center justify-center py-10">
-        <div className="container text-center mb-6">
-          <h2 className="text-xl text-gray-700">
-            Vending Machine Inventory: {inventory}
-          </h2>
-          {error && <p className="text-red-500 mt-4">{error}</p>}
-        </div>
-
-        <div className="mb-6">
-          <button
-            onClick={() => setRole("buyer")}
-            className={`px-6 py-2 mr-4 ${
-              role === "buyer" ? "bg-blue-600 text-white" : "bg-gray-300"
-            }`}
-          >
-            Buyer
-          </button>
-          <button
-            onClick={() => setRole("seller")}
-            className={`px-6 py-2 ${
-              role === "seller" ? "bg-blue-600 text-white" : "bg-gray-300"
-            }`}
-          >
-            Seller
-          </button>
-        </div>
-
-        {role === "buyer" ? (
-          <div className="flex flex-col md:flex-row items-center gap-8">
-            <div className="bg-white p-6 rounded-lg shadow-md w-72 text-center">
-              <h3 className="text-2xl text-gray-800 mb-4">Your Bid Amount</h3>
-              <input
-                type="number"
-                placeholder="Enter your bid"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-green-500"
-                onChange={(e) => setBidAmount(e.target.value)}
-                value={bidAmount}
-              />
-            </div>
-
-            <div className="bg-white p-6 rounded-lg shadow-md w-72 text-center">
-              <h3 className="text-2xl text-gray-800 mb-4">Amount to Buy</h3>
-              <input
-                type="number"
-                placeholder="Enter amount"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-green-500"
-                onChange={(e) => setBuyAmount(e.target.value)}
-                value={buyAmount}
-              />
-            </div>
-            <button
-              onClick={bidAmountHandler}
-              className="bg-blue-500 text-white py-3 px-8 text-lg font-semibold rounded-lg transition-all duration-300 hover:bg-blue-600"
-            >
-              Buy
-            </button>
+    <div className="min-h-screen bg-gradient-to-br from-teal-50 to-green-100">
+      {/* Header */}
+      <header className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex justify-between items-center">
+          <div className="flex items-center space-x-2">
+            <ArrowRightLeft className="h-6 w-6 text-teal-600" />
+            <h1 className="text-xl font-bold text-gray-900">
+              Energy Trading Platform
+            </h1>
           </div>
-        ) : (
-          <div className="flex flex-col md:flex-row items-center gap-8">
-            <div className="bg-white p-6 rounded-lg shadow-md w-72 text-center">
-              <h3 className="text-2xl text-gray-800 mb-4">Per KWh Cost</h3>
-              <input
-                type="number"
-                placeholder="Enter cost"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-green-500"
-                onChange={(e) => setSellPrice(e.target.value)}
-                value={sellPrice}
-              />
-            </div>
+          <button
+            onClick={connectWalletHandler}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-lg ${
+              account
+                ? "bg-teal-100 text-teal-700"
+                : "bg-teal-600 text-white hover:bg-teal-700"
+            }`}
+          >
+            <Wallet className="h-5 w-5" />
+            <span>{account ? "Wallet Connected" : "Connect Wallet"}</span>
+          </button>
+        </div>
+      </header>
 
-            <div className="bg-white p-6 rounded-lg shadow-md w-72 text-center">
-              <h3 className="text-2xl text-gray-800 mb-4">Amount to Sell</h3>
-              <input
-                type="number"
-                placeholder="Enter amount"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-green-500"
-                onChange={(e) => setSellAmount(e.target.value)}
-                value={sellAmount}
-              />
-            </div>
-            <button onClick={sellAmountHandler} className="bg-green-500 text-white py-3 px-8 text-lg font-semibold rounded-lg transition-all duration-300 hover:bg-green-600">
-              Sell
+      <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+        {error && (
+          <div className="relative mb-4">
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+            <div 
+              className="absolute bottom-0 left-0 h-1 bg-red-600 transition-all duration-50"
+              style={{ width: `${errorProgress}%` }}
+            />
+          </div>
+        )}
+
+        {/* Role Selection */}
+        {!role && (
+          <div className="grid md:grid-cols-2 gap-8 mt-8">
+            <button
+              onClick={() => setRole("buyer")}
+              disabled={!account}
+              className={`flex flex-col items-center p-8 bg-white rounded-xl shadow-lg transition-all
+                ${
+                  account
+                    ? "hover:shadow-xl cursor-pointer"
+                    : "opacity-50 cursor-not-allowed"
+                }
+              `}
+            >
+              <Battery className="h-16 w-16 text-teal-600 mb-4" />
+              <h2 className="text-2xl font-bold text-gray-900">Buy Energy</h2>
+              <p className="mt-2 text-gray-600">Purchase energy from sellers</p>
+              {!account && (
+                <p className="mt-2 text-sm text-red-500">
+                  Connect wallet to continue
+                </p>
+              )}
+            </button>
+
+            <button
+              onClick={() => setRole("seller")}
+              disabled={!account}
+              className={`flex flex-col items-center p-8 bg-white rounded-xl shadow-lg transition-all
+                ${
+                  account
+                    ? "hover:shadow-xl cursor-pointer"
+                    : "opacity-50 cursor-not-allowed"
+                }
+              `}
+            >
+              <BatteryCharging className="h-16 w-16 text-teal-600 mb-4" />
+              <h2 className="text-2xl font-bold text-gray-900">Sell Energy</h2>
+              <p className="mt-2 text-gray-600">Sell your excess energy</p>
+              {!account && (
+                <p className="mt-2 text-sm text-red-500">
+                  Connect wallet to continue
+                </p>
+              )}
             </button>
           </div>
         )}
-      </section>
+
+        {/* Trading Interface */}
+        {role && (
+          <div className="max-w-2xl mx-auto">
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {role === "buyer" ? "Buy Energy" : "Sell Energy"}
+                </h2>
+                <button
+                  onClick={() => setRole(null)}
+                  className="text-teal-600 hover:text-teal-900"
+                >
+                  Change Role
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Amount (kWh)
+                  </label>
+                  <input
+                    type="number"
+                    value={role === "buyer" ? buyAmount : sellAmount}
+                    onChange={(e) =>
+                      role === "buyer"
+                        ? setBuyAmount(e.target.value)
+                        : setSellAmount(e.target.value)
+                    }
+                    className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2 text-gray-900 placeholder-gray-400"
+                    placeholder="Enter amount in kWh"
+                    required
+                  />
+                </div>
+
+                {role === "buyer" ? (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Bid Amount (ETH)
+                    </label>
+                    <input
+                      type="number"
+                      value={bidAmount}
+                      onChange={(e) => setBidAmount(e.target.value)}
+                      className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2 text-gray-900 placeholder-gray-400"
+                      placeholder="Enter your bid"
+                      required
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Cost per kWh (ETH)
+                    </label>
+                    <input
+                      type="number"
+                      value={sellPrice}
+                      onChange={(e) => setSellPrice(e.target.value)}
+                      className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2 text-gray-900 placeholder-gray-400"
+                      placeholder="Enter cost per kWh"
+                      required
+                    />
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white 
+                    ${
+                      role === "buyer"
+                        ? "bg-teal-600 hover:bg-teal-700"
+                        : "bg-teal-600 hover:bg-teal-700"
+                    }
+                    ${!account && "opacity-50 cursor-not-allowed"}
+                  `}
+                  disabled={!account}
+                >
+                  {role === "buyer" ? "Place Bid" : "List for Sale"}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+      </main>
     </div>
   );
 }
