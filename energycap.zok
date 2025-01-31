@@ -1,0 +1,7 @@
+def main(field tradeAmount, field marketCap) -> field{
+
+    assert(tradeAmount <= marketCap);
+    return 1;
+
+}
+    

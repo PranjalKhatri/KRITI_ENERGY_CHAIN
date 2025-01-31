@@ -1,0 +1,17 @@
+def main(
+    field dsoPrice, 
+    field finalMedianPrice, 
+    field tradeAmount, 
+    field sellerRemainingEnergy, 
+    field buyerBalance
+) -> field:
+
+    field priceValid = if dsoPrice == finalMedianPrice then 1 else 0 fi
+    
+    field energyValid = if sellerRemainingEnergy >= tradeAmount then 1 else 0 fi
+    
+    field cost = dsoPrice * tradeAmount
+    field balanceValid = if buyerBalance >= cost then 1 else 0 fi
+   
+    field isValid = priceValid * energyValid * balanceValid
+    return isValid

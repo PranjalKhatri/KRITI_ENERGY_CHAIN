@@ -1,0 +1,14 @@
+def main(private field sellerEnergy, private field buyerDemand, private field marketCap) -> (field , field){
+
+    field initialTrade = sellerEnergy < buyerDemand ? sellerEnergy : buyerDemand ;
+
+    field cappedTrade = initialTrade > marketCap ? marketCap : initialTrade ;
+
+    field remainingEnergy = sellerEnergy - cappedTrade;
+   
+    return (cappedTrade, remainingEnergy);
+
+}
+    
+    
+   
