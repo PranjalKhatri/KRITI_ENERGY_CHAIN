@@ -16,7 +16,8 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "solc": "^0.8.28",
-    "web3": "^4.16.0"
+    "web3": "^4.16.0",
+    "zokrates-js": "^1.1.9"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

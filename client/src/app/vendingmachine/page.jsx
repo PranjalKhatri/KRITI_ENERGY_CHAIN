@@ -2,10 +2,20 @@
 
 import { useState, useEffect } from "react";
 import Web3 from "web3";
-import { Wallet, Battery, BatteryCharging, ArrowRightLeft, ArrowUpCircle, ArrowDownCircle, History, Coins } from "lucide-react";
+import {
+  Wallet,
+  Battery,
+  BatteryCharging,
+  ArrowRightLeft,
+  ArrowUpCircle,
+  ArrowDownCircle,
+  History,
+  Coins,
+} from "lucide-react";
 import { Alert, AlertDescription } from "../../components/alert";
 import vmContract from "../../../blockchain/firstcontract";
 import closebid from "../../../blockchain/closebid";
+import { initialize } from "zokrates-js";
 
 export default function VendingMachine() {
   const [error, setError] = useState("");
@@ -20,7 +30,7 @@ export default function VendingMachine() {
   const [sellAmount, setSellAmount] = useState("");
   const [lastBid, setLastBid] = useState(null);
   const [totalBids, setTotalBids] = useState({ count: 0, volume: 0 });
-  const [currentPage, setCurrentPage] = useState('trading');
+  const [currentPage, setCurrentPage] = useState("trading");
   const [walletBalance, setWalletBalance] = useState("0");
   const [transactionAmount, setTransactionAmount] = useState("");
   const [isDeposit, setIsDeposit] = useState(true);
@@ -56,10 +66,51 @@ export default function VendingMachine() {
     }
   }, [error]);
 
+  const ZokratesVerifier = async (balance, totalBidCost) => {
+    initialize().then(async (zokratesProvider) => {
+      const source =
+        "def main(field balance, field totalBidCost) -> field {field res = balance >= totalBidCost ? 1 : 0; return res;}";
+      // compilation
+      const artifacts = zokratesProvider.compile(source);
+      // computation
+      const { witness, output } = zokratesProvider.computeWitness(artifacts, [
+        balance,
+        totalBidCost,
+      ]);
+      console.log("Witness:", witness);
+      console.log("output:", output);
+      // run setup
+      const keypair = zokratesProvider.setup(artifacts.program);
+      console.log("Keypair:", keypair);
+      // generate proof
+      const proof = zokratesProvider.generateProof(
+        artifacts.program,
+        witness,
+        keypair.pk
+      );
+
+      // export solidity verifier
+      //TODO: Get the verifier deployed on blockchain
+      const verifier = zokratesProvider.exportSolidityVerifier(keypair.vk);
+      console.log("Proof:", proof);
+      console.log("Verifier:", verifier);
+      try {
+        const tx = await verifier.methods.verifyTx(proof.a,proof.b,proof.c,proof.inputs);
+        await tx.wait();
+        console.log("Proof verified successfully");
+      } catch (error) {
+        console.error("Error verifying proof:", error);
+        setError(error.message);
+      }
+      // or verify off-chain
+      // const isVerified = zokratesProvider.verify(keypair.vk, proof);
+    });
+  };
+
   const updateWalletBalance = async () => {
     try {
       const balance = await web3.eth.getBalance(account);
-      setWalletBalance(web3.utils.fromWei(balance, 'ether'));
+      setWalletBalance(web3.utils.fromWei(balance, "ether"));
     } catch (err) {
       console.error("Error fetching balance:", err);
       setError(err.message);
@@ -111,8 +162,8 @@ export default function VendingMachine() {
     }
 
     try {
-      const amountInWei = web3.utils.toWei(transactionAmount, 'ether');
-      
+      const amountInWei = web3.utils.toWei(transactionAmount, "ether");
+
       if (isDeposit) {
         // Handle deposit (send ETH to contract)
         await web3.eth.sendTransaction({
@@ -124,14 +175,13 @@ export default function VendingMachine() {
         // Handle withdraw (call withdraw function on contract)
         // Note: Your smart contract needs a withdraw function
         await closebid.methods.withdraw(amountInWei).send({
-          from: account
+          from: account,
         });
       }
 
       // Update balance after transaction
       await updateWalletBalance();
       setTransactionAmount("");
-      
     } catch (err) {
       console.error("Transaction error:", err);
       setError(err.message);
@@ -148,19 +198,34 @@ export default function VendingMachine() {
       const accounts = await web3.eth.getAccounts();
       const account = accounts[0];
 
+      
+      console.log(parseInt(amount) * parseInt(price));
+      ZokratesVerifier(
+        web3.utils.toWei(walletBalance.toString(), "ether"), // Convert walletBalance to Wei
+        web3.utils.toWei(
+          (parseInt(amount) * parseInt(price)).toString(),
+          "ether"
+        ) // Convert total cost to Wei
+      );
       const transaction = {
         from: account,
         to: closebid.options.address,
         data: closebid.methods
-          .placeBid(parseInt(amount), parseInt(price), Boolean(isProducer))
-          .encodeABI(),
-          gas: 2000000,
+        .placeBid(parseInt(amount), parseInt(price), Boolean(isProducer))
+        .encodeABI(),
+        gas: 2000000,
       };
-
       const result = await web3.eth.sendTransaction(transaction);
-      
-      setLastBid({ amount, price, timestamp: new Date().toLocaleString() });
-      setTotalBids(prev => ({ count: prev.count + 1, volume: prev.volume + parseInt(amount) }));
+      setLastBid({
+        amount,
+        price,
+        timestamp: new Date().toLocaleString(),
+        type: isProducer,
+      });
+      setTotalBids((prev) => ({
+        count: prev.count + 1,
+        volume: prev.volume + parseInt(amount),
+      }));
 
       console.log("Bid placed successfully:", result);
       return result;
@@ -187,7 +252,9 @@ export default function VendingMachine() {
 
   const BidHistory = () => (
     <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">Trading History</h3>
+      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+        Trading History
+      </h3>
       <div className="grid grid-cols-2 gap-6">
         <div className="space-y-2">
           <div className="flex items-center space-x-2">
@@ -196,20 +263,33 @@ export default function VendingMachine() {
           </div>
           {lastBid && (
             <div className="bg-blue-50 rounded-lg p-4">
-              <div className="text-sm text-gray-600">Amount: {lastBid.amount} kWh</div>
-              <div className="text-sm text-gray-600">Price: {lastBid.price} ETH/kWh</div>
+              <div className="text-sm text-gray-600">
+                Amount: {lastBid.amount} kWh
+              </div>
+              <div className="text-sm text-gray-600">
+                Price: {lastBid.price} ETH/kWh
+              </div>
               <div className="text-xs text-gray-500">{lastBid.timestamp}</div>
+              <div className="text-xs text-gray-500">
+                Type: {lastBid.type == 0 ? "Buy" : "Sell"}
+              </div>
             </div>
           )}
         </div>
         <div className="space-y-2">
           <div className="flex items-center space-x-2">
             <Coins className="h-5 w-5 text-green-500" />
-            <span className="text-sm font-medium text-gray-700">Total Trading Activity</span>
+            <span className="text-sm font-medium text-gray-700">
+              Total Trading Activity
+            </span>
           </div>
           <div className="bg-green-50 rounded-lg p-4">
-            <div className="text-sm text-gray-600">Total Bids: {totalBids.count}</div>
-            <div className="text-sm text-gray-600">Volume: {totalBids.volume} kWh</div>
+            <div className="text-sm text-gray-600">
+              Total Bids: {totalBids.count}
+            </div>
+            <div className="text-sm text-gray-600">
+              Volume: {totalBids.volume} kWh
+            </div>
           </div>
         </div>
       </div>
@@ -221,8 +301,12 @@ export default function VendingMachine() {
       return (
         <div className="flex flex-col items-center justify-center py-12">
           <Wallet className="h-16 w-16 text-gray-400 mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Connect Your Wallet</h2>
-          <p className="text-gray-600">Please connect your wallet to access this feature</p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            Connect Your Wallet
+          </h2>
+          <p className="text-gray-600">
+            Please connect your wallet to access this feature
+          </p>
         </div>
       );
     }
@@ -231,74 +315,27 @@ export default function VendingMachine() {
       <div className="max-w-2xl mx-auto">
         {/* Wallet Info */}
         <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Wallet Overview</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-4">
+            Wallet Overview
+          </h2>
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-2">
               <span className="text-sm font-medium text-gray-500">Balance</span>
-              <div className="text-3xl font-bold text-gray-900">{walletBalance} ETH</div>
+              <div className="text-3xl font-bold text-gray-900">
+                {walletBalance} ETH
+              </div>
             </div>
             <div className="space-y-2">
-              <span className="text-sm font-medium text-gray-500">Wallet Address</span>
-              <div className="text-sm font-mono bg-gray-50 p-2 rounded">{`${account.slice(0, 6)}...${account.slice(-4)}`}</div>
+              <span className="text-sm font-medium text-gray-500">
+                Wallet Address
+              </span>
+              <div className="text-sm font-mono bg-gray-50 text-gray-700 p-2 rounded">
+                {`${account.slice(0, 6)}...${account.slice(-4)}`}
+              </div>
             </div>
           </div>
         </div>
-
         {/* Transaction Form */}
-        <div className="bg-white rounded-xl shadow-lg p-6">
-          <div className="flex space-x-4 mb-6">
-            <button
-              onClick={() => setIsDeposit(true)}
-              className={`flex-1 flex items-center justify-center space-x-2 py-2 px-4 rounded-lg ${
-                isDeposit
-                  ? 'bg-teal-100 text-teal-700'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              <ArrowDownCircle className="h-5 w-5" />
-              <span>Deposit</span>
-            </button>
-            <button
-              onClick={() => setIsDeposit(false)}
-              className={`flex-1 flex items-center justify-center space-x-2 py-2 px-4 rounded-lg ${
-                !isDeposit
-                  ? 'bg-teal-100 text-teal-700'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              <ArrowUpCircle className="h-5 w-5" />
-              <span>Withdraw</span>
-            </button>
-          </div>
-
-          <form onSubmit={handleWalletTransaction} className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Amount (ETH)
-              </label>
-              <input
-                type="number"
-                step="0.0001"
-                value={transactionAmount}
-                onChange={(e) => setTransactionAmount(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2"
-                placeholder="Enter amount in ETH"
-                required
-                min="0"
-              />
-            </div>
-
-            <button
-              type="submit"
-              className={`w-full flex justify-center items-center space-x-2 py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
-                isDeposit ? 'bg-teal-600 hover:bg-teal-700' : 'bg-teal-600 hover:bg-teal-700'
-              }`}
-            >
-              {isDeposit ? <ArrowDownCircle className="h-5 w-5" /> : <ArrowUpCircle className="h-5 w-5" />}
-              <span>{isDeposit ? 'Deposit' : 'Withdraw'} ETH</span>
-            </button>
-          </form>
-        </div>
       </div>
     );
   };
@@ -311,26 +348,28 @@ export default function VendingMachine() {
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-2">
               <ArrowRightLeft className="h-6 w-6 text-teal-600" />
-              <h1 className="text-xl font-bold text-gray-900">Energy Trading Platform</h1>
+              <h1 className="text-xl font-bold text-gray-900">
+                Energy Trading Platform
+              </h1>
             </div>
             <div className="flex items-center space-x-4">
               <nav className="flex space-x-4">
                 <button
-                  onClick={() => setCurrentPage('trading')}
+                  onClick={() => setCurrentPage("trading")}
                   className={`px-3 py-2 rounded-md text-sm font-medium ${
-                    currentPage === 'trading'
-                      ? 'bg-gray-100 text-gray-900'
-                      : 'text-gray-600 hover:text-gray-900'
+                    currentPage === "trading"
+                      ? "bg-gray-100 text-gray-900"
+                      : "text-gray-600 hover:text-gray-900"
                   }`}
                 >
                   Trading
                 </button>
                 <button
-                  onClick={() => setCurrentPage('wallet')}
+                  onClick={() => setCurrentPage("wallet")}
                   className={`px-3 py-2 rounded-md text-sm font-medium ${
-                    currentPage === 'wallet'
-                      ? 'bg-gray-100 text-gray-900'
-                      : 'text-gray-600 hover:text-gray-900'
+                    currentPage === "wallet"
+                      ? "bg-gray-100 text-gray-900"
+                      : "text-gray-600 hover:text-gray-900"
                   }`}
                 >
                   Wallet
@@ -358,14 +397,14 @@ export default function VendingMachine() {
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
             </Alert>
-            <div 
+            <div
               className="absolute bottom-0 left-0 h-1 bg-red-600 transition-all duration-50"
               style={{ width: `${errorProgress}%` }}
             />
           </div>
         )}
 
-        {currentPage === 'trading' ? (
+        {currentPage === "trading" ? (
           <>
             {/* Role Selection */}
             {!role && (
@@ -382,8 +421,12 @@ export default function VendingMachine() {
                   `}
                 >
                   <Battery className="h-16 w-16 text-teal-600 mb-4" />
-                  <h2 className="text-2xl font-bold text-gray-900">Buy Energy</h2>
-                  <p className="mt-2 text-gray-600">Purchase energy from sellers</p>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    Buy Energy
+                  </h2>
+                  <p className="mt-2 text-gray-600">
+                    Purchase energy from sellers
+                  </p>
                   {!account && (
                     <p className="mt-2 text-sm text-red-500">
                       Connect wallet to continue
@@ -403,7 +446,9 @@ export default function VendingMachine() {
                   `}
                 >
                   <BatteryCharging className="h-16 w-16 text-teal-600 mb-4" />
-                  <h2 className="text-2xl font-bold text-gray-900">Sell Energy</h2>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    Sell Energy
+                  </h2>
                   <p className="mt-2 text-gray-600">Sell your excess energy</p>
                   {!account && (
                     <p className="mt-2 text-sm text-red-500">
@@ -418,7 +463,7 @@ export default function VendingMachine() {
             {role && (
               <div className="max-w-2xl mx-auto">
                 {account && lastBid && <BidHistory />}
-                
+
                 <div className="bg-white rounded-xl shadow-lg p-6">
                   <div className="flex items-center justify-between mb-6">
                     <h2 className="text-2xl font-bold text-gray-900">
@@ -506,4 +551,4 @@ export default function VendingMachine() {
       </main>
     </div>
   );
-} 
+}
