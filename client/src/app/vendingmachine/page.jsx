@@ -15,6 +15,7 @@ import {
 import { Alert, AlertDescription } from "../../components/alert";
 import vmContract from "../../../blockchain/firstcontract";
 import closebid from "../../../blockchain/closebid";
+import executeEnergy from "../../../blockchain/executeEnergy";
 import { initialize } from "zokrates-js";
 
 export default function VendingMachine() {
@@ -95,7 +96,12 @@ export default function VendingMachine() {
       console.log("Proof:", proof);
       console.log("Verifier:", verifier);
       try {
-        const tx = await verifier.methods.verifyTx(proof.a,proof.b,proof.c,proof.inputs);
+        const tx = await verifier.methods.verifyTx(
+          proof.a,
+          proof.b,
+          proof.c,
+          proof.inputs
+        );
         await tx.wait();
         console.log("Proof verified successfully");
       } catch (error) {
@@ -188,6 +194,38 @@ export default function VendingMachine() {
     }
   };
 
+  async function depositFunds(amountInWei) {
+    console.log("Depositing amount:", amountInWei);
+    try {
+      const accounts = await web3.eth.getAccounts();
+      const sender = accounts[0];
+
+      // Get the function data for depositFunds
+      const data = executeEnergy.methods.depositFunds().encodeABI();
+
+      const transaction = {
+        from: sender,
+        to: executeEnergy.options.address,
+        value: amountInWei,
+        gas: 3000000,
+        data: data, // Include the encoded function call data
+      };
+
+      const result = await web3.eth.sendTransaction(transaction);
+      console.log("Transaction hash:", result.transactionHash);
+
+      const contractBalance = await web3.eth.getBalance(
+        executeEnergy.options.address
+      );
+      console.log("Contract ETH Balance:", contractBalance);
+
+      return result;
+    } catch (error) {
+      console.error("Error depositing funds:", error);
+      throw error;
+    }
+  }
+
   async function placeBid(amount, price, isProducer) {
     if (!web3 || !account) {
       setError("Web3 or account not initialized. Please connect your wallet.");
@@ -198,21 +236,27 @@ export default function VendingMachine() {
       const accounts = await web3.eth.getAccounts();
       const account = accounts[0];
 
-      
-      console.log(parseInt(amount) * parseInt(price));
-      ZokratesVerifier(
-        web3.utils.toWei(walletBalance.toString(), "ether"), // Convert walletBalance to Wei
-        web3.utils.toWei(
-          (parseInt(amount) * parseInt(price)).toString(),
-          "ether"
-        ) // Convert total cost to Wei
-      );
+      console.log(amount * price);
+      //{ ZOKRATES }------------------------------
+
+      // ZokratesVerifier(
+      //   web3.utils.toWei(walletBalance.toString(), "ether"), // Convert walletBalance to Wei
+      //   web3.utils.toWei(
+      //     (parseInt(amount) * parseInt(price)).toString(),
+      //     "ether"
+      //   ) // Convert total cost to Wei
+      // );
+      //{ZOKRATES}--------------------------------
       const transaction = {
         from: account,
         to: closebid.options.address,
         data: closebid.methods
-        .placeBid(parseInt(amount), parseInt(price), Boolean(isProducer))
-        .encodeABI(),
+          .placeBid(
+            amount,
+            web3.utils.toWei(price.toString(), "ether"),
+            Boolean(isProducer)
+          )
+          .encodeABI(),
         gas: 2000000,
       };
       const result = await web3.eth.sendTransaction(transaction);
@@ -226,8 +270,10 @@ export default function VendingMachine() {
         count: prev.count + 1,
         volume: prev.volume + parseInt(amount),
       }));
-
       console.log("Bid placed successfully:", result);
+
+      depositFunds(web3.utils.toWei((amount * price).toString(), "ether"));
+
       return result;
     } catch (error) {
       console.error("Error placing bid:", error);
@@ -338,6 +384,92 @@ export default function VendingMachine() {
         {/* Transaction Form */}
       </div>
     );
+  };
+
+  const gimmeMoney = async () => {
+    try {
+      const accounts = await web3.eth.getAccounts();
+      const sender = accounts[0];
+
+      // Get the function data for depositFunds
+      const data = executeEnergy.methods.executeEnergyExchange().encodeABI();
+
+      const transaction = {
+        from: sender,
+        to: executeEnergy.options.address,
+        // value: amountInWei,
+        gas: 3000000,
+        data: data, // Include the encoded function call data
+      };
+
+      const result = await web3.eth.sendTransaction(transaction);
+      console.log("Transaction hash:", result.transactionHash);
+
+      const contractBalance = await web3.eth.getBalance(
+        executeEnergy.options.address
+      );
+      console.log("Contract ETH Balance:", contractBalance);
+
+      return result;
+
+      // Alternative Method 2: Using sendTransaction with encoded data
+      // const data = executeEnergy.methods.executeEnergyExchange().encodeABI();
+      // const tx = await web3.eth.sendTransaction({
+      //     from: sender,
+      //     to: executeEnergy.options.address,
+      //     gas: 3000000,
+      //     data: data
+      // });
+
+      // Log events if any were emitted
+      if (tx.events) {
+        if (tx.events.EnergyCleared) {
+          const event = tx.events.EnergyCleared;
+          console.log("Energy Cleared Event:", {
+            producer: event.returnValues.producer,
+            consumer: event.returnValues.consumer,
+            amount: event.returnValues.amount,
+            price: event.returnValues.price,
+          });
+        }
+
+        if (tx.events.PaymentProcessed) {
+          const event = tx.events.PaymentProcessed;
+          console.log("Payment Processed Event:", {
+            payer: event.returnValues.payer,
+            receiver: event.returnValues.receiver,
+            amount: event.returnValues.amount,
+            totalCost: event.returnValues.totalCost,
+          });
+        }
+
+        if (tx.events.DSOTransaction) {
+          const event = tx.events.DSOTransaction;
+          console.log("DSO Transaction Event:", {
+            entity: event.returnValues.entity,
+            amount: event.returnValues.amount,
+            price: event.returnValues.price,
+            isSelling: event.returnValues.isSelling,
+          });
+        }
+      }
+
+      // Get updated contract state
+      const DSOEnergy = await executeEnergy.methods.getDSOEnergy().call();
+      const DSOBalance = await executeEnergy.methods.getDSOETHBalance().call();
+
+      console.log("Updated DSO Energy:", DSOEnergy);
+      console.log("Updated DSO ETH Balance:", DSOBalance);
+
+      return tx;
+    } catch (error) {
+      console.error("Error executing energy exchange:", error);
+      if (error.message.includes("revert")) {
+        // Handle specific revert reasons if provided by the contract
+        console.error("Contract reverted:", error.message);
+      }
+      throw error;
+    }
   };
 
   return (
@@ -549,6 +681,7 @@ export default function VendingMachine() {
           <WalletPage />
         )}
       </main>
+      <button onClick={gimmeMoney}>EXECUTE ENERGY</button>
     </div>
   );
 }
