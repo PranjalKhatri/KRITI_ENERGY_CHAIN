@@ -1,5 +1,5 @@
 def main(field balance, field totalBidCost) -> field {
     
-    assert(balance >= totalBidCost);
-    return 1;
+    field res = if balance >= totalBidCost ? 1:0;
+    return res;
 }

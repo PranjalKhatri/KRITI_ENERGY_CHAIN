@@ -1,7 +1,7 @@
 def main(private field energyReserve, field sellAmount) -> field{
 
-     assert(energyReserve >= sellAmount);
-     return 1;
+     field res = if energyReserve >= sellAmount ? 1 : 0;
+     return res;
 
 }
    

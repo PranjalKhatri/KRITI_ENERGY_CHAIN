@@ -1,7 +1,7 @@
 def main(field tradeAmount, field marketCap) -> field{
 
-    assert(tradeAmount <= marketCap);
-    return 1;
+    field res = if tradeAmount <= marketCap ? 1:0;
+    return res;
 
 }
     

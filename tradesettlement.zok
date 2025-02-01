@@ -1,11 +1,10 @@
 def main(field sellerPrice, field buyerBid, field marketCap, field tradeAmount) -> (field, field){
 
-    assert(sellerPrice <= buyerBid && tradeAmount <= marketCap);
-    return 1;
+    field res = sellerPrice <= buyerBid && tradeAmount <= marketCap ? 1 : 0;
 
     field finalMedianPrice = (sellerPrice + buyerBid) / 2;
 
-   return finalMedianPrice;
+   return ( res , finalMedianPrice ) ;
 }
     
    
