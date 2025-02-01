@@ -133,7 +133,23 @@ export default function VendingMachine() {
       setError(err.message);
     }
   };
-
+  const getContractBalance = async () => {
+    if (!web3 || !executeEnergy) {
+      setError("Web3 or Contract not initialized. Connect your wallet first.");
+      return;
+    }
+  
+    try {
+      const balance = await executeEnergy.methods.getBalance(account).call({from:account});
+      console.log("Contract Balance:", web3.utils.fromWei(balance, "ether"));
+      return web3.utils.fromWei(balance, "ether"); // Convert Wei to ETH
+    } catch (err) {
+      console.error("Error fetching contract balance:", err);
+      setError(err.message);
+    }
+  };
+  
+  
   const connectWalletHandler = async () => {
     if (typeof window.ethereum !== "undefined") {
       try {
@@ -158,6 +174,12 @@ export default function VendingMachine() {
     } else {
       setError("Please install MetaMask.");
     }
+
+
+    //---------------{Getting user balance}
+    const consumerBalance = getContractBalance();
+    console.log(consumerBalance);
+    //-----------------------------
   };
 
   const handleWalletTransaction = async (e) => {
