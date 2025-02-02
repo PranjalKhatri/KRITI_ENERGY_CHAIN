@@ -10,6 +10,7 @@
     "compile": "solcjs --abi --include-path node_modules/ --base-path . blockchain/contracts/FirstContract.sol --output-dir blockchain/build"
   },
   "dependencies": {
+    "axios": "^1.7.9",
     "dotenv": "^16.4.7",
     "lucide-react": "^0.474.0",
     "next": "15.1.6",

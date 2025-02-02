@@ -19,6 +19,7 @@ import vmContract from "../../../blockchain/firstcontract";
 import closebid from "../../../blockchain/closebid";
 import executeEnergy from "../../../blockchain/executeEnergy";
 import { initialize } from "zokrates-js";
+import axios from "axios";
 
 export default function VendingMachine() {
   const [error, setError] = useState("");
@@ -27,15 +28,19 @@ export default function VendingMachine() {
   const [role, setRole] = useState(null);
   const [web3, setWeb3] = useState(null);
   const [account, setAccount] = useState(null);
+
+  const [currentPage, setCurrentPage] = useState("trading");
   const [buyAmount, setBuyAmount] = useState("");
   const [bidAmount, setBidAmount] = useState("");
   const [sellPrice, setSellPrice] = useState("");
   const [sellAmount, setSellAmount] = useState("");
   const [lastBid, setLastBid] = useState(null);
   const [totalBids, setTotalBids] = useState({ count: 0, volume: 0 });
-  const [currentPage, setCurrentPage] = useState("trading");
+
   const [walletBalance, setWalletBalance] = useState("0");
+
   const [transactionAmount, setTransactionAmount] = useState("");
+  const [transactions, setTransactions] = useState([]);
   const [isDeposit, setIsDeposit] = useState(true);
   const [depositAmount, setDepositAmount] = useState(0);
   const [tradingMode, setTradingMode] = useState("p2p"); // "p2p" or "dso"
@@ -70,6 +75,22 @@ export default function VendingMachine() {
       };
     }
   }, [error]);
+
+  useEffect(() => {
+    if (!account) return;
+
+    const fetchBalance = async () => {
+      updateWalletBalance();
+      // const consumerBalance = await getContractBalance();
+      // console.log("Updated Balance:", consumerBalance);
+    };
+
+    fetchBalance(); // Run immediately
+
+    const interval = setInterval(fetchBalance, 10000); // Run every 10 seconds
+
+    return () => clearInterval(interval); // Cleanup on unmount or account change
+  }, [account]);
 
   const ZokratesVerifier = async (balance, totalBidCost) => {
     initialize().then(async (zokratesProvider) => {
@@ -110,7 +131,7 @@ export default function VendingMachine() {
         console.log("Proof verified successfully");
       } catch (error) {
         console.error("Error verifying proof:", error);
-        setError(error.message);
+        setError(error instanceof Error ? error.message : String(error));
       }
       // or verify off-chain
       // const isVerified = zokratesProvider.verify(keypair.vk, proof);
@@ -123,7 +144,67 @@ export default function VendingMachine() {
       setWalletBalance(web3.utils.fromWei(balance, "ether"));
     } catch (err) {
       console.error("Error fetching balance:", err);
-      setError(err.message);
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const fetchUserTransactions = async (userId) => {
+    console.log("string userid ",toString(userId));
+    try {
+      // 🔹 Create a user if they don't exist
+      await axios.post(`http://localhost:8000/api/v1/users/create`, {
+        "accountNumber": userId, // Assuming `userId` is the account number
+        "name": "Pranjal", // You might need to get this dynamically
+        "email": `pranjal@gmail.com`, // Provide a default email
+      });
+    } catch (err) {
+      console.log("Error in user (duplication probably)")
+      console.error(err);
+    }
+    try {
+      // 🔹 Fetch transactions for the user
+      const response = await axios.get(
+        `http://localhost:8000/api/v1/transactions/user/${userId}`
+      );
+      console.log(response.data);
+      setTransactions(response.data); // Store transactions in state
+    } catch (error) {
+      console.error("Error fetching transactions:", error);
+      setError(error.response?.data?.message || "Could not fetch transactions");
+    }
+  };
+
+  const createTransaction = async (
+    energyAmount,
+    pricePerUnit,
+    transactionType
+  ) => {
+    try {
+      // Transaction payload
+      const transactionData = {
+        accountNumber: account,
+        energyAmount: energyAmount,
+        pricePerUnit: pricePerUnit,
+        transactionType: transactionType,
+      };
+
+      // ✅ Send the transaction to backend API
+      const response = await axios.post(
+        "http://localhost:8000/api/v1/transactions/create",
+        transactionData,
+        {
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+
+      console.log("Transaction Created:", response.data);
+      fetchUserTransactions(account); // Fetch updated transactions
+      return response.data; // Return the created transaction
+    } catch (error) {
+      console.error("Error creating transaction:", error);
+      throw new Error(
+        error.response?.data?.message || "Transaction creation failed"
+      );
     }
   };
 
@@ -134,24 +215,29 @@ export default function VendingMachine() {
       console.log("Inventory:", inventory);
     } catch (err) {
       console.error(err.message);
-      setError(err.message);
+      setError(err instanceof Error ? err.message : String(err));
     }
   };
   const getContractBalance = async () => {
-    if (!web3 || !executeEnergy) {
-      setError("Web3 or Contract not initialized. Connect your wallet first.");
+    if (!web3 || !executeEnergy || !account) {
+      setError(
+        "Web3, contract, or account not initialized. Connect your wallet first."
+      );
       return;
     }
 
     try {
-      const balance = await executeEnergy.methods
-        .getBalance(account)
-        .call({ from: account });
-      console.log("Contract Balance:", web3.utils.fromWei(balance, "ether"));
-      return web3.utils.fromWei(balance, "ether"); // Convert Wei to ETH
+      // Correct call without gas or encodeABI()
+      const balance = await executeEnergy.methods.getBalance(account).call();
+
+      console.log(
+        "User Contract Balance:",
+        web3.utils.fromWei(balance, "ether")
+      );
+      return web3.utils.fromWei(balance, "ether"); // Convert from Wei to ETH
     } catch (err) {
       console.error("Error fetching contract balance:", err);
-      setError(err.message);
+      setError(err instanceof Error ? err.message : String(err));
     }
   };
 
@@ -172,18 +258,14 @@ export default function VendingMachine() {
           return;
         }
         console.log("Account connected: ", account);
+        fetchUserTransactions(account);
       } catch (err) {
         console.error("Error connecting to wallet:", err);
-        setError(err.message);
+        setError(err instanceof Error ? err.message : String(err));
       }
     } else {
       setError("Please install MetaMask.");
     }
-
-    //---------------{Getting user balance}
-    const consumerBalance = getContractBalance();
-    console.log(consumerBalance);
-    //-----------------------------
   };
 
   const handleWalletTransaction = async (e) => {
@@ -216,7 +298,58 @@ export default function VendingMachine() {
       setTransactionAmount("");
     } catch (err) {
       console.error("Transaction error:", err);
-      setError(err.message);
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+  const withdrawFunds = async () => {
+    if (!web3 || !executeEnergy || !account) {
+      setError("Web3, contract, or account not initialized.");
+      return;
+    }
+
+    try {
+      // Fetch user balance in contract before withdrawal
+      const balanceWei = await executeEnergy.methods.getBalance(account).call();
+      const balanceETH = web3.utils.fromWei(balanceWei, "ether");
+
+      console.log(`User Contract Balance: ${balanceETH} ETH`);
+
+      // Prevent transaction if balance is 0
+      if (parseFloat(balanceETH) === 0) {
+        setError("Insufficient funds in contract to withdraw.");
+        return;
+      }
+
+      // Fetch the contract's total ETH balance
+      const contractBalanceWei = await web3.eth.getBalance(
+        executeEnergy.options.address
+      );
+      const contractBalanceETH = web3.utils.fromWei(
+        contractBalanceWei,
+        "ether"
+      );
+
+      console.log(`Contract ETH Balance: ${contractBalanceETH} ETH`);
+
+      // Prevent transaction if contract itself has insufficient ETH
+      if (parseFloat(contractBalanceETH) < parseFloat(balanceETH)) {
+        setError("Contract does not have enough ETH to process withdrawal.");
+        return;
+      }
+
+      // Execute withdrawal transaction
+      const transaction = await executeEnergy.methods.withdrawFunds().send({
+        from: account,
+        gas: 3000000,
+      });
+
+      console.log("Withdraw Transaction Hash:", transaction.transactionHash);
+
+      // Refresh user balance after withdrawal
+      await getContractBalance();
+    } catch (err) {
+      console.error("Error withdrawing funds:", err);
+      setError(err.message || "Withdrawal failed");
     }
   };
 
@@ -301,10 +434,12 @@ export default function VendingMachine() {
 
       // depositFunds(web3.utils.toWei((amount * price).toString(), "ether"));
 
+      createTransaction(amount, price, isProducer ? "sell" : "buy");
+
       return result;
-    } catch (error) {
-      console.error("Error placing bid:", error);
-      setError(error.message);
+    } catch (err) {
+      console.error("Error placing bid:", err);
+      setError(err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -319,7 +454,7 @@ export default function VendingMachine() {
       await getInventoryHandler();
     } catch (err) {
       console.error(err.message);
-      setError(err.message);
+      setError(err instanceof Error ? err.message : String(err));
     }
   };
 
@@ -368,8 +503,23 @@ export default function VendingMachine() {
       </div>
     </div>
   );
-
   const WalletPage = () => {
+    // Temporary test transaction
+    const testTransaction = [
+      {
+        _id: "test123",
+        energyAmount: 50,
+        pricePerUnit: 0.05,
+        totalPrice: 2.5,
+        transactionType: "buy",
+        timestamp: new Date().toISOString(),
+      },
+    ];
+
+    // Use test transactions if transactions array is empty
+    const displayTransactions =transactions;
+      // transactions.length > 0 ? transactions : testTransaction;
+
     if (!account) {
       return (
         <div className="flex flex-col items-center justify-center py-12">
@@ -408,11 +558,117 @@ export default function VendingMachine() {
             </div>
           </div>
         </div>
-        {/* Transaction Form */}
+
+        {/* Transactions Table */}
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Transactions</h2>
+          {displayTransactions.length === 0 ? (
+            <p className="text-gray-500">No transactions found.</p>
+          ) : (
+            <table className="w-full border-collapse border border-gray-200">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="border border-gray-300 px-4 py-2">Energy</th>
+                  <th className="border border-gray-300 px-4 py-2">
+                    Price/Unit
+                  </th>
+                  <th className="border border-gray-300 px-4 py-2">
+                    Total Price
+                  </th>
+                  <th className="border border-gray-300 px-4 py-2">Type</th>
+                  <th className="border border-gray-300 px-4 py-2">Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {displayTransactions.map((tx) => (
+                  <tr key={tx._id} className="text-center">
+                    <td className="border border-gray-300 px-4 py-2">
+                      {tx.energyAmount} kWh
+                    </td>
+                    <td className="border border-gray-300 px-4 py-2">
+                      {tx.pricePerUnit} ETH
+                    </td>
+                    <td className="border border-gray-300 px-4 py-2">
+                      {tx.totalPrice} ETH
+                    </td>
+                    <td
+                      className={`border border-gray-300 px-4 py-2 font-bold ${
+                        tx.transactionType === "buy"
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {tx.transactionType.toUpperCase()}
+                    </td>
+                    <td className="border border-gray-300 px-4 py-2">
+                      {new Date(tx.timestamp).toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
     );
   };
 
+  const buyFromDSO = async (energyAmount) => {
+    if (!web3 || !account) {
+      setError("Web3 or account not initialized. Please connect your wallet.");
+      return;
+    }
+    // const price =
+    try {
+      const accounts = await web3.eth.getAccounts();
+      const account = accounts[0];
+      // console.log("Total cost in ETH:", amount * price);
+
+      const transaction = {
+        from: account,
+        to: executeEnergy.options.address,
+        data: executeEnergy.methods.buyEnergyFromDSO(energyAmount).encodeABI(),
+        gas: 2000000,
+        value: energyAmount,
+      };
+
+      const result = await web3.eth.sendTransaction(transaction);
+      console.log("Energy purchase successful:", result);
+
+      return result;
+    } catch (err) {
+      console.error("Error buying energy:", err);
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+  const SellToDSO = async (energyAmount) => {
+    if (!web3 || !account) {
+      setError("Web3 or account not initialized. Please connect your wallet.");
+      return;
+    }
+    // const price =
+    try {
+      const accounts = await web3.eth.getAccounts();
+      const account = accounts[0];
+      // console.log("Total cost in ETH:", amount * price);
+
+      const transaction = {
+        from: account,
+        to: executeEnergy.options.address,
+        data: executeEnergy.methods.sellEnergyToDSO(energyAmount).encodeABI(),
+        gas: 2000000,
+        value: energyAmount,
+      };
+
+      const result = await web3.eth.sendTransaction(transaction);
+      console.log("Energy Selling successful:", result);
+
+      return result;
+    } catch (err) {
+      console.error("Error Selling energy:", err);
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
   const gimmeMoney = async () => {
     try {
       const accounts = await web3.eth.getAccounts();
@@ -660,16 +916,26 @@ export default function VendingMachine() {
                 </button>
               </div>
             )}
-          {/* DSO Trading Interface */}
-          {!role && tradingMode === "dso" && (
+            {/* DSO Trading Interface */}
+            {!role && tradingMode === "dso" && (
               <div className="grid md:grid-cols-2 gap-8 mt-8">
                 <div className="bg-white rounded-xl shadow-lg p-8">
                   <div className="text-center mb-6">
                     <Building2 className="h-16 w-16 text-teal-600 mx-auto mb-4" />
-                    <h2 className="text-2xl font-bold text-gray-900">Buy from DSO</h2>
-                    <p className="mt-2 text-gray-600">Current DSO Rate: 0.15 ETH/kWh</p>
+                    <h2 className="text-2xl font-bold text-gray-900">
+                      Buy from DSO
+                    </h2>
+                    <p className="mt-2 text-gray-600">
+                      Current DSO Rate: 0.15 ETH/kWh
+                    </p>
                   </div>
-                  <form onSubmit={handleSubmit} className="space-y-6">
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      buyFromDSO(buyAmount);
+                    }}
+                    className="space-y-6"
+                  >
                     <div>
                       <label className="block text-sm font-medium text-gray-700">
                         Amount (kWh)
@@ -696,10 +962,20 @@ export default function VendingMachine() {
                 <div className="bg-white rounded-xl shadow-lg p-8">
                   <div className="text-center mb-6">
                     <Building2 className="h-16 w-16 text-teal-600 mx-auto mb-4" />
-                    <h2 className="text-2xl font-bold text-gray-900">Sell to DSO</h2>
-                    <p className="mt-2 text-gray-600">Current DSO Buy Rate: 0.12 ETH/kWh</p>
+                    <h2 className="text-2xl font-bold text-gray-900">
+                      Sell to DSO
+                    </h2>
+                    <p className="mt-2 text-gray-600">
+                      Current DSO Buy Rate: 0.12 ETH/kWh
+                    </p>
                   </div>
-                  <form onSubmit={handleSubmit} className="space-y-6">
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      SellToDSO(sellAmount);
+                    }}
+                    className="space-y-6"
+                  >
                     <div>
                       <label className="block text-sm font-medium text-gray-700">
                         Amount (kWh)
@@ -724,7 +1000,7 @@ export default function VendingMachine() {
                 </div>
               </div>
             )}
-            
+
             {/* Trading Interface */}
             {role && (
               <div className="max-w-2xl mx-auto">
@@ -849,7 +1125,7 @@ export default function VendingMachine() {
           <WalletPage />
         )}
       </main>
-      <button onClick={gimmeMoney}>EXECUTE ENERGY</button>
+      <button onClick={withdrawFunds}>EXECUTE ENERGY</button>
     </div>
   );
 }
