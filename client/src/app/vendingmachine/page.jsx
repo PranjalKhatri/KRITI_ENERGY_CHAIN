@@ -35,6 +35,7 @@ export default function VendingMachine() {
   const [walletBalance, setWalletBalance] = useState("0");
   const [transactionAmount, setTransactionAmount] = useState("");
   const [isDeposit, setIsDeposit] = useState(true);
+  const [depositAmount,setDepositAmount] = useState(0);
 
   useEffect(() => {
     getInventoryHandler();
@@ -138,9 +139,11 @@ export default function VendingMachine() {
       setError("Web3 or Contract not initialized. Connect your wallet first.");
       return;
     }
-  
+
     try {
-      const balance = await executeEnergy.methods.getBalance(account).call({from:account});
+      const balance = await executeEnergy.methods
+        .getBalance(account)
+        .call({ from: account });
       console.log("Contract Balance:", web3.utils.fromWei(balance, "ether"));
       return web3.utils.fromWei(balance, "ether"); // Convert Wei to ETH
     } catch (err) {
@@ -148,8 +151,7 @@ export default function VendingMachine() {
       setError(err.message);
     }
   };
-  
-  
+
   const connectWalletHandler = async () => {
     if (typeof window.ethereum !== "undefined") {
       try {
@@ -174,7 +176,6 @@ export default function VendingMachine() {
     } else {
       setError("Please install MetaMask.");
     }
-
 
     //---------------{Getting user balance}
     const consumerBalance = getContractBalance();
@@ -217,6 +218,7 @@ export default function VendingMachine() {
   };
 
   async function depositFunds(amountInWei) {
+    console.log(depositAmount);
     console.log("Depositing amount:", amountInWei);
     try {
       const accounts = await web3.eth.getAccounts();
@@ -294,7 +296,7 @@ export default function VendingMachine() {
       }));
       console.log("Bid placed successfully:", result);
 
-      depositFunds(web3.utils.toWei((amount * price).toString(), "ether"));
+      // depositFunds(web3.utils.toWei((amount * price).toString(), "ether"));
 
       return result;
     } catch (error) {
@@ -613,8 +615,8 @@ export default function VendingMachine() {
               </div>
             )}
 
-            {/* Trading Interface */}
-            {role && (
+       {/* Trading Interface */}
+       {role && (
               <div className="max-w-2xl mx-auto">
                 {account && lastBid && <BidHistory />}
 
@@ -651,49 +653,75 @@ export default function VendingMachine() {
                     </div>
 
                     {role === "buyer" ? (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                          Bid Amount (ETH)
-                        </label>
-                        <input
-                          type="number"
-                          value={bidAmount}
-                          onChange={(e) => setBidAmount(e.target.value)}
-                          className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2 text-gray-900 placeholder-gray-400"
-                          placeholder="Enter your bid"
-                          required
-                        />
-                      </div>
+                      <>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">
+                            Bid Amount (ETH)
+                          </label>
+                          <input
+                            type="number"
+                            value={bidAmount}
+                            onChange={(e) => setBidAmount(e.target.value)}
+                            className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2 text-gray-900 placeholder-gray-400"
+                            placeholder="Enter your bid"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">
+                            Deposit Amount (ETH)
+                          </label>
+                          <input
+                            type="number"
+                            value={depositAmount}
+                            onChange={(e) => setDepositAmount(e.target.value)}
+                            className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2"
+                            placeholder="Enter deposit amount"
+                            required
+                          />
+                        </div>
+                        <div className="flex space-x-4">
+                          <button
+                            type="submit"
+                            className="flex-1 py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={!account}
+                          >
+                            Place Bid
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e)=>{e.preventDefault();depositFunds(web3.utils.toWei(depositAmount.toString(), "ether"))}}
+                            className="flex-1 py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={!account}
+                          >
+                            Deposit Funds
+                          </button>
+                        </div>
+                      </>
                     ) : (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                          Cost per kWh (ETH)
-                        </label>
-                        <input
-                          type="number"
-                          value={sellPrice}
-                          onChange={(e) => setSellPrice(e.target.value)}
-                          className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2 text-gray-900 placeholder-gray-400"
-                          placeholder="Enter cost per kWh"
-                          required
-                        />
-                      </div>
+                      <>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">
+                            Cost per kWh (ETH)
+                          </label>
+                          <input
+                            type="number"
+                            value={sellPrice}
+                            onChange={(e) => setSellPrice(e.target.value)}
+                            className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2 text-gray-900 placeholder-gray-400"
+                            placeholder="Enter cost per kWh"
+                            required
+                          />
+                        </div>
+                        <button
+                          type="submit"
+                          className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={!account}
+                        >
+                          List for Sale
+                        </button>
+                      </>
                     )}
-
-                    <button
-                      type="submit"
-                      className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white 
-                        ${
-                          role === "buyer"
-                            ? "bg-teal-600 hover:bg-teal-700"
-                            : "bg-teal-600 hover:bg-teal-700"
-                        }
-                        ${!account && "opacity-50 cursor-not-allowed"}
-                      `}
-                      disabled={!account}
-                    >
-                      {role === "buyer" ? "Place Bid" : "List for Sale"}
-                    </button>
                   </form>
                 </div>
               </div>
