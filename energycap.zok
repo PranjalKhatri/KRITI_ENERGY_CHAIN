@@ -1,6 +1,7 @@
 def main(field tradeAmount, field marketCap) -> field{
 
-    field res = if tradeAmount <= marketCap ? 1:0;
+    field res = tradeAmount <= marketCap ? 1 : 0 ;
+
     return res;
 
 }

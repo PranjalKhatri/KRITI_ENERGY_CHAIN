@@ -1,0 +1,32 @@
+{
+  "inputs": [
+    {
+      "name": "sellerEnergy",
+      "public": false,
+      "type": "field"
+    },
+    {
+      "name": "buyerDemand",
+      "public": false,
+      "type": "field"
+    },
+    {
+      "name": "marketCap",
+      "public": false,
+      "type": "field"
+    }
+  ],
+  "output": {
+    "type": "tuple",
+    "components": {
+      "elements": [
+        {
+          "type": "field"
+        },
+        {
+          "type": "field"
+        }
+      ]
+    }
+  }
+}

@@ -1,5 +1,7 @@
 def main(field balance, field totalBidCost) -> field {
     
-    field res = if balance >= totalBidCost ? 1:0;
-    return res;
+    field result = balance >= totalBidCost ? 1 : 0 ;
+
+    return result ;
+
 }
