@@ -7,6 +7,8 @@ import {
   Battery,
   BatteryCharging,
   ArrowRightLeft,
+  ArrowLeftRight,
+  Building2,
   ArrowUpCircle,
   ArrowDownCircle,
   History,
@@ -35,7 +37,8 @@ export default function VendingMachine() {
   const [walletBalance, setWalletBalance] = useState("0");
   const [transactionAmount, setTransactionAmount] = useState("");
   const [isDeposit, setIsDeposit] = useState(true);
-  const [depositAmount,setDepositAmount] = useState(0);
+  const [depositAmount, setDepositAmount] = useState(0);
+  const [tradingMode, setTradingMode] = useState("p2p"); // "p2p" or "dso"
 
   useEffect(() => {
     getInventoryHandler();
@@ -548,11 +551,29 @@ export default function VendingMachine() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+        {/* ERROR BAR */}
         {error && (
           <div className="relative mb-4">
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
+            <div className="bg-red-50 border-l-4 border-red-400 p-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg
+                    className="h-5 w-5 text-red-400"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-red-700">{error}</p>
+                </div>
+              </div>
+            </div>
             <div
               className="absolute bottom-0 left-0 h-1 bg-red-600 transition-all duration-50"
               style={{ width: `${errorProgress}%` }}
@@ -562,19 +583,46 @@ export default function VendingMachine() {
 
         {currentPage === "trading" ? (
           <>
-            {/* Role Selection */}
+            {/* Trading Mode Selection */}
             {!role && (
+              <div className="mb-8">
+                <div className="flex justify-center space-x-4 p-4 bg-white rounded-lg shadow-sm">
+                  <button
+                    onClick={() => setTradingMode("p2p")}
+                    className={`px-6 py-3 rounded-lg flex items-center space-x-2 ${
+                      tradingMode === "p2p"
+                        ? "bg-teal-100 text-teal-800"
+                        : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    <ArrowLeftRight className="h-5 w-5" />
+                    <span>Peer-to-Peer Trading</span>
+                  </button>
+                  <button
+                    onClick={() => setTradingMode("dso")}
+                    className={`px-6 py-3 rounded-lg flex items-center space-x-2 ${
+                      tradingMode === "dso"
+                        ? "bg-teal-100 text-teal-800"
+                        : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    <Building2 className="h-5 w-5" />
+                    <span>DSO Trading</span>
+                  </button>
+                </div>
+              </div>
+            )}
+            {/* Role Selection */}
+            {!role && tradingMode === "p2p" && (
               <div className="grid md:grid-cols-2 gap-8 mt-8">
                 <button
                   onClick={() => setRole("buyer")}
                   disabled={!account}
-                  className={`flex flex-col items-center p-8 bg-white rounded-xl shadow-lg transition-all
-                    ${
-                      account
-                        ? "hover:shadow-xl cursor-pointer"
-                        : "opacity-50 cursor-not-allowed"
-                    }
-                  `}
+                  className={`flex flex-col items-center p-8 bg-white rounded-xl shadow-lg transition-all ${
+                    account
+                      ? "hover:shadow-xl cursor-pointer"
+                      : "opacity-50 cursor-not-allowed"
+                  }`}
                 >
                   <Battery className="h-16 w-16 text-teal-600 mb-4" />
                   <h2 className="text-2xl font-bold text-gray-900">
@@ -593,13 +641,11 @@ export default function VendingMachine() {
                 <button
                   onClick={() => setRole("seller")}
                   disabled={!account}
-                  className={`flex flex-col items-center p-8 bg-white rounded-xl shadow-lg transition-all
-                    ${
-                      account
-                        ? "hover:shadow-xl cursor-pointer"
-                        : "opacity-50 cursor-not-allowed"
-                    }
-                  `}
+                  className={`flex flex-col items-center p-8 bg-white rounded-xl shadow-lg transition-all ${
+                    account
+                      ? "hover:shadow-xl cursor-pointer"
+                      : "opacity-50 cursor-not-allowed"
+                  }`}
                 >
                   <BatteryCharging className="h-16 w-16 text-teal-600 mb-4" />
                   <h2 className="text-2xl font-bold text-gray-900">
@@ -614,9 +660,73 @@ export default function VendingMachine() {
                 </button>
               </div>
             )}
+          {/* DSO Trading Interface */}
+          {!role && tradingMode === "dso" && (
+              <div className="grid md:grid-cols-2 gap-8 mt-8">
+                <div className="bg-white rounded-xl shadow-lg p-8">
+                  <div className="text-center mb-6">
+                    <Building2 className="h-16 w-16 text-teal-600 mx-auto mb-4" />
+                    <h2 className="text-2xl font-bold text-gray-900">Buy from DSO</h2>
+                    <p className="mt-2 text-gray-600">Current DSO Rate: 0.15 ETH/kWh</p>
+                  </div>
+                  <form onSubmit={handleSubmit} className="space-y-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Amount (kWh)
+                      </label>
+                      <input
+                        type="number"
+                        value={buyAmount}
+                        onChange={(e) => setBuyAmount(e.target.value)}
+                        className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2"
+                        placeholder="Enter amount to buy"
+                        required
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className="w-full py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50"
+                      disabled={!account}
+                    >
+                      Buy from DSO
+                    </button>
+                  </form>
+                </div>
 
-       {/* Trading Interface */}
-       {role && (
+                <div className="bg-white rounded-xl shadow-lg p-8">
+                  <div className="text-center mb-6">
+                    <Building2 className="h-16 w-16 text-teal-600 mx-auto mb-4" />
+                    <h2 className="text-2xl font-bold text-gray-900">Sell to DSO</h2>
+                    <p className="mt-2 text-gray-600">Current DSO Buy Rate: 0.12 ETH/kWh</p>
+                  </div>
+                  <form onSubmit={handleSubmit} className="space-y-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Amount (kWh)
+                      </label>
+                      <input
+                        type="number"
+                        value={sellAmount}
+                        onChange={(e) => setSellAmount(e.target.value)}
+                        className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2"
+                        placeholder="Enter amount to sell"
+                        required
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className="w-full py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50"
+                      disabled={!account}
+                    >
+                      Sell to DSO
+                    </button>
+                  </form>
+                </div>
+              </div>
+            )}
+            
+            {/* Trading Interface */}
+            {role && (
               <div className="max-w-2xl mx-auto">
                 {account && lastBid && <BidHistory />}
 
@@ -690,7 +800,15 @@ export default function VendingMachine() {
                           </button>
                           <button
                             type="button"
-                            onClick={(e)=>{e.preventDefault();depositFunds(web3.utils.toWei(depositAmount.toString(), "ether"))}}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              depositFunds(
+                                web3.utils.toWei(
+                                  depositAmount.toString(),
+                                  "ether"
+                                )
+                              );
+                            }}
                             className="flex-1 py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
                             disabled={!account}
                           >
