@@ -108,10 +108,12 @@ contract ClosedBid {
     }
 
     function getProducers() external view returns (Participant[] memory) {
+        // returns array of producers
         return producers;
     }
 
     function getConsumers() external view returns (Participant[] memory) {
+        // returns array of consumers
         return consumers;
     }
 }
