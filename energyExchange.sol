@@ -25,9 +25,16 @@ contract EnergyExchange {
     uint256 public p_buy = 2;
     uint256 public p_sell = 8;
 
-    event EnergyCleared(address indexed producer, address indexed consumer, uint256 amount, uint256 price);
-    event PaymentProcessed(address indexed payer, address indexed receiver, uint256 amount, uint256 totalCost);
-    event DSOTransaction(address indexed entity, uint256 amount, uint256 price, bool isSelling);
+    // **Storage for tracking transactions**
+    struct Transaction {
+        address producer;
+        address consumer;
+        uint256 amount;
+        uint256 price;
+    }
+
+    Transaction[] public successfulTransactions; // Stores all successful transactions
+    mapping(address => uint256) public dsoFunctionCalls; // Tracks how many times each address called DSO functions
 
     constructor(address _closedBidAddress, address payable _DSO) {
         closedBidContract = IClosedBid(_closedBidAddress);
@@ -39,37 +46,41 @@ contract EnergyExchange {
         balances[msg.sender] += msg.value;
     }
 
-    // Separated function for producers to sell energy to DSO
     function sellEnergyToDSO(uint256 amount) external payable {
         require(amount > 0, "Amount must be greater than zero");
         
-        uint256 totalCost = amount * p_buy * 1 ether; // Calculate payment in Wei
+        uint256 totalCost = amount * p_buy * 1 ether;
         require(DSOETHBalance >= totalCost, "DSO has insufficient ETH");
 
-        // Update states
         clearedEnergy[msg.sender] += amount;
         balances[msg.sender] += totalCost;
         DSOETHBalance -= totalCost;
         DSOEnergy += amount;
 
-        emit DSOTransaction(msg.sender, amount, p_buy, false);
+        // Track function call
+        dsoFunctionCalls[msg.sender]++;
+
+        // Store transaction record
+        successfulTransactions.push(Transaction(msg.sender, address(DSO), amount, p_buy));
     }
 
-    // Separated function for consumers to buy energy from DSO
-    function buyEnergyFromDSO(uint256 amount) external payable  {
+    function buyEnergyFromDSO(uint256 amount) external payable {
         require(amount > 0, "Amount must be greater than zero");
         
-        uint256 totalCost = amount * p_sell * 1 ether; // Calculate payment in Wei
+        uint256 totalCost = amount * p_sell * 1 ether;
         require(balances[msg.sender] >= totalCost, "Consumer has insufficient funds for DSO purchase");
         require(DSOEnergy >= amount, "DSO has insufficient energy");
 
-        // Update states
         clearedEnergy[msg.sender] += amount;
         balances[msg.sender] -= totalCost;
         DSOETHBalance += totalCost;
         DSOEnergy -= amount;
 
-        emit DSOTransaction(msg.sender, amount, p_sell, true);
+        // Track function call
+        dsoFunctionCalls[msg.sender]++;
+
+        // Store transaction record
+        successfulTransactions.push(Transaction(address(DSO), msg.sender, amount, p_sell));
     }
 
     function executeEnergyExchange() external payable {
@@ -82,7 +93,6 @@ contract EnergyExchange {
         uint256 i = 0;
         uint256 j = 0;
 
-        // P2P Matching
         while (i < producers.length && j < consumers.length) {
             address payable producer = producers[i].bidder;
             address payable consumer = consumers[j].bidder;
@@ -106,8 +116,8 @@ contract EnergyExchange {
                 balances[consumer] -= totalCost;
                 balances[producer] += totalCost;
 
-                emit EnergyCleared(producer, consumer, clearAmount, clearPrice);
-                emit PaymentProcessed(consumer, producer, clearAmount, totalCost);
+                // Store successful transaction
+                successfulTransactions.push(Transaction(producer, consumer, clearAmount, clearPrice));
 
                 producers[i].amount -= clearAmount;
                 consumers[j].amount -= clearAmount;
@@ -128,6 +138,7 @@ contract EnergyExchange {
         payable(msg.sender).transfer(balance);
     }
 
+    // **Getter Functions**
     function getClearedEnergy(address bidder) external view returns (uint256) {
         return clearedEnergy[bidder];
     }
@@ -143,6 +154,23 @@ contract EnergyExchange {
     function getDSOETHBalance() external view returns (uint256) {
         return DSOETHBalance;
     }
+
+    function getTransactionCount() external view returns (uint256) {
+        return successfulTransactions.length;
+    }
+
+    function getTransactionDetails(uint256 index) external view returns (address, address, uint256, uint256) {
+        require(index < successfulTransactions.length, "Invalid index");
+        Transaction storage txn = successfulTransactions[index];
+        return (txn.producer, txn.consumer, txn.amount, txn.price);
+    }
+
+    function getDSOFunctionCalls(address user) external view returns (uint256) {
+        return dsoFunctionCalls[user];
+    }
+
+    
+
 
     function _sortAscending(IClosedBid.Participant[] memory arr) internal pure {
         uint256 n = arr.length;
