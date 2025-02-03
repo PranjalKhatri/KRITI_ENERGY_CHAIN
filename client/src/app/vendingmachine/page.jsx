@@ -18,8 +18,10 @@ import { Alert, AlertDescription } from "../../components/alert";
 import vmContract from "../../../blockchain/firstcontract";
 import closebid from "../../../blockchain/closebid";
 import executeEnergy from "../../../blockchain/executeEnergy";
+import buyersBalance from "../../../blockchain/buyersBalance";
 import { initialize } from "zokrates-js";
 import axios from "axios";
+import { loadProvingKey, loadArtifacts } from "./artifactLoader";
 
 export default function VendingMachine() {
   const [error, setError] = useState("");
@@ -138,6 +140,196 @@ export default function VendingMachine() {
     });
   };
 
+  const buyersBalanceVerifier = async (balance, totalBidCost) => {
+    initialize().then(async (zokratesProvider) => {
+      const artifacts = await loadArtifacts("buyersbalance/Buyersbalance_out");
+      const provingKey = await loadProvingKey("buyersbalance/proving.key");
+
+      if (!artifacts || !provingKey) {
+        console.error("Failed to load artifacts or proving key.");
+        return;
+      }
+
+      console.log("Artifacts:", artifacts);
+      console.log("Proving Key:", provingKey);
+
+      try {
+        // Compute witness
+        const { witness, output } = await zokratesProvider.computeWitness(
+          artifacts,
+          [balance, totalBidCost]
+        );
+
+        console.log("Witness:", witness);
+        console.log("Output:", output);
+
+        // Generate proof using the proving key
+        const proof = zokratesProvider.generateProof(
+          artifacts.program,
+          witness,
+          provingKey
+        );
+        const verifierABI = [
+          {
+            inputs: [
+              {
+                components: [
+                  {
+                    components: [
+                      {
+                        internalType: "uint256",
+                        name: "X",
+                        type: "uint256",
+                      },
+                      {
+                        internalType: "uint256",
+                        name: "Y",
+                        type: "uint256",
+                      },
+                    ],
+                    internalType: "struct Pairing.G1Point",
+                    name: "a",
+                    type: "tuple",
+                  },
+                  {
+                    components: [
+                      {
+                        internalType: "uint256[2]",
+                        name: "X",
+                        type: "uint256[2]",
+                      },
+                      {
+                        internalType: "uint256[2]",
+                        name: "Y",
+                        type: "uint256[2]",
+                      },
+                    ],
+                    internalType: "struct Pairing.G2Point",
+                    name: "b",
+                    type: "tuple",
+                  },
+                  {
+                    components: [
+                      {
+                        internalType: "uint256",
+                        name: "X",
+                        type: "uint256",
+                      },
+                      {
+                        internalType: "uint256",
+                        name: "Y",
+                        type: "uint256",
+                      },
+                    ],
+                    internalType: "struct Pairing.G1Point",
+                    name: "c",
+                    type: "tuple",
+                  },
+                ],
+                internalType: "struct Verifier.Proof",
+                name: "proof",
+                type: "tuple",
+              },
+              {
+                internalType: "uint256[3]",
+                name: "input",
+                type: "uint256[3]",
+              },
+            ],
+            name: "verifyTx",
+            outputs: [
+              {
+                internalType: "bool",
+                name: "r",
+                type: "bool",
+              },
+            ],
+            stateMutability: "view",
+            type: "function",
+          },
+        ];
+        let verifier = new web3.eth.Contract(
+          verifierABI,
+          "0x64D8EDDf2ECb86F876D33af4CBfAB4F981Ce43Fd",
+          {
+            from: account, // default from address
+            gasPrice: "2000000000000", // default gas price in wei
+          }
+        );
+        console.log("Generated Proof:", proof);
+        const gasPrice = await web3.eth.getGasPrice();
+        console.log("Current gas price:", gasPrice);
+        // Get account balance
+        const balance_ = await web3.eth.getBalance(account);
+        console.log(
+          "Account balance:",
+          web3.utils.fromWei(balance_, "ether"),
+          "ETH"
+        );
+
+        // Estimate gas for the transaction
+        const gasEstimate = await verifier.methods
+          .verifyTx(proof.proof, proof.inputs)
+          .estimateGas({ from: account });
+
+        console.log("Estimated gas:", gasEstimate);
+
+        // Add 20% buffer to gas estimate
+        const gasLimit = Math.ceil(Number(gasEstimate) * 1.2); // Converts gasEstimate to a regular number
+
+        // Calculate total cost
+        const totalCost = BigInt(gasPrice) * BigInt(gasLimit);
+        console.log("Total gas cost in wei:", totalCost.toString());
+
+        // Convert total cost to ether:
+        const totalCostInEther = web3.utils.fromWei(
+          totalCost.toString(),
+          "ether"
+        );
+        console.log("Estimated total cost in ether:", totalCostInEther);
+
+        let result = await verifier.methods
+          .verifyTx(proof.proof, proof.inputs)
+          .call({ from: account });
+        // Verify proof on-chain
+        //   const verifier = buyersBalance; // Ensure this is an initialized contract instance
+        //   if (!verifier) {
+        //     console.error("Verifier contract instance is not set.");
+        //     return;
+        //   }
+
+        //   // const tx = await verifier.methods
+        //   //   .verifyTx(
+        //   //     proof.proof,
+        //   //     proof.inputs
+        //   //   )
+        //   // const result = await verifier.methods
+        //   //   .verifyTx(proof.inputs, proof.proof)
+        //   //   .call();
+        //   const tx = {
+        //     from: account,
+        //     to: buyersBalance.options.address,
+        //     data: buyersBalance.methods.verifyTx(
+        //       {
+        //         a: proof.proof.a, // ✅ Struct format is correct
+        //         b: proof.proof.b,
+        //         c: proof.proof.c
+        //       },
+        //       proof.inputs // ✅ Ensure this is an array of length 3
+        //     ).encodeABI(),
+        //     gas: 3000000,
+        //   };
+
+        //   const result = await web3.eth.sendTransaction(tx);
+        //   console.log("Proof verification transaction sent:", result);
+
+        // console.log("Proof verified successfully:", tx);
+      } catch (error) {
+        console.error("Error verifying proof:", error);
+      }
+    });
+  };
+
   const updateWalletBalance = async () => {
     try {
       const balance = await web3.eth.getBalance(account);
@@ -149,16 +341,16 @@ export default function VendingMachine() {
   };
 
   const fetchUserTransactions = async (userId) => {
-    console.log("string userid ",toString(userId));
+    console.log("string userid ", toString(userId));
     try {
       // 🔹 Create a user if they don't exist
       await axios.post(`http://localhost:8000/api/v1/users/create`, {
-        "accountNumber": userId, // Assuming `userId` is the account number
-        "name": "Pranjal", // You might need to get this dynamically
-        "email": `pranjal@gmail.com`, // Provide a default email
+        accountNumber: userId, // Assuming `userId` is the account number
+        name: "Pranjal", // You might need to get this dynamically
+        email: `pranjal@gmail.com`, // Provide a default email
       });
     } catch (err) {
-      console.log("Error in user (duplication probably)")
+      console.log("Error in user (duplication probably)");
       console.error(err);
     }
     try {
@@ -398,14 +590,14 @@ export default function VendingMachine() {
 
       console.log(amount * price);
       //{ ZOKRATES }------------------------------
-
-      // ZokratesVerifier(
-      //   web3.utils.toWei(walletBalance.toString(), "ether"), // Convert walletBalance to Wei
-      //   web3.utils.toWei(
-      //     (parseInt(amount) * parseInt(price)).toString(),
-      //     "ether"
-      //   ) // Convert total cost to Wei
-      // );
+      console.log(
+        web3.utils.toWei(walletBalance.toString(), "ether"), // Convert walletBalance to Wei
+        web3.utils.toWei((amount * price).toString(), "ether")
+      );
+      buyersBalanceVerifier(
+        web3.utils.toWei(walletBalance.toString(), "ether"), // Convert walletBalance to Wei
+        web3.utils.toWei((amount * price).toString(), "ether") // Convert total cost to Wei
+      );
       //{ZOKRATES}--------------------------------
       const transaction = {
         from: account,
@@ -517,8 +709,8 @@ export default function VendingMachine() {
     ];
 
     // Use test transactions if transactions array is empty
-    const displayTransactions =transactions;
-      // transactions.length > 0 ? transactions : testTransaction;
+    const displayTransactions = transactions;
+    // transactions.length > 0 ? transactions : testTransaction;
 
     if (!account) {
       return (
