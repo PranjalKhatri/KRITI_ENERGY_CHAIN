@@ -141,194 +141,72 @@ export default function VendingMachine() {
   };
 
   const buyersBalanceVerifier = async (balance, totalBidCost) => {
-    initialize().then(async (zokratesProvider) => {
+    try {
+      // Initialize ZoKrates provider
+      const zokratesProvider = await initialize();
+  
       const artifacts = await loadArtifacts("buyersbalance/Buyersbalance_out");
       const provingKey = await loadProvingKey("buyersbalance/proving.key");
-
+  
       if (!artifacts || !provingKey) {
         console.error("Failed to load artifacts or proving key.");
-        return;
+        return false; // Return false if artifacts or proving key are not found
       }
-
+  
       console.log("Artifacts:", artifacts);
       console.log("Proving Key:", provingKey);
-
-      try {
-        // Compute witness
-        const { witness, output } = await zokratesProvider.computeWitness(
-          artifacts,
-          [balance, totalBidCost]
-        );
-
-        console.log("Witness:", witness);
-        console.log("Output:", output);
-
-        // Generate proof using the proving key
-        const proof = zokratesProvider.generateProof(
-          artifacts.program,
-          witness,
-          provingKey
-        );
-        const verifierABI = [
-          {
-            inputs: [
-              {
-                components: [
-                  {
-                    components: [
-                      {
-                        internalType: "uint256",
-                        name: "X",
-                        type: "uint256",
-                      },
-                      {
-                        internalType: "uint256",
-                        name: "Y",
-                        type: "uint256",
-                      },
-                    ],
-                    internalType: "struct Pairing.G1Point",
-                    name: "a",
-                    type: "tuple",
-                  },
-                  {
-                    components: [
-                      {
-                        internalType: "uint256[2]",
-                        name: "X",
-                        type: "uint256[2]",
-                      },
-                      {
-                        internalType: "uint256[2]",
-                        name: "Y",
-                        type: "uint256[2]",
-                      },
-                    ],
-                    internalType: "struct Pairing.G2Point",
-                    name: "b",
-                    type: "tuple",
-                  },
-                  {
-                    components: [
-                      {
-                        internalType: "uint256",
-                        name: "X",
-                        type: "uint256",
-                      },
-                      {
-                        internalType: "uint256",
-                        name: "Y",
-                        type: "uint256",
-                      },
-                    ],
-                    internalType: "struct Pairing.G1Point",
-                    name: "c",
-                    type: "tuple",
-                  },
-                ],
-                internalType: "struct Verifier.Proof",
-                name: "proof",
-                type: "tuple",
-              },
-              {
-                internalType: "uint256[3]",
-                name: "input",
-                type: "uint256[3]",
-              },
-            ],
-            name: "verifyTx",
-            outputs: [
-              {
-                internalType: "bool",
-                name: "r",
-                type: "bool",
-              },
-            ],
-            stateMutability: "view",
-            type: "function",
-          },
-        ];
-        let verifier = new web3.eth.Contract(
-          verifierABI,
-          "0x64D8EDDf2ECb86F876D33af4CBfAB4F981Ce43Fd",
-          {
-            from: account, // default from address
-            gasPrice: "2000000000000", // default gas price in wei
-          }
-        );
-        console.log("Generated Proof:", proof);
-        const gasPrice = await web3.eth.getGasPrice();
-        console.log("Current gas price:", gasPrice);
-        // Get account balance
-        const balance_ = await web3.eth.getBalance(account);
-        console.log(
-          "Account balance:",
-          web3.utils.fromWei(balance_, "ether"),
-          "ETH"
-        );
-
-        // Estimate gas for the transaction
-        const gasEstimate = await verifier.methods
-          .verifyTx(proof.proof, proof.inputs)
-          .estimateGas({ from: account });
-
-        console.log("Estimated gas:", gasEstimate);
-
-        // Add 20% buffer to gas estimate
-        const gasLimit = Math.ceil(Number(gasEstimate) * 1.2); // Converts gasEstimate to a regular number
-
-        // Calculate total cost
-        const totalCost = BigInt(gasPrice) * BigInt(gasLimit);
-        console.log("Total gas cost in wei:", totalCost.toString());
-
-        // Convert total cost to ether:
-        const totalCostInEther = web3.utils.fromWei(
-          totalCost.toString(),
-          "ether"
-        );
-        console.log("Estimated total cost in ether:", totalCostInEther);
-
-        let result = await verifier.methods
-          .verifyTx(proof.proof, proof.inputs)
-          .call({ from: account });
-        // Verify proof on-chain
-        //   const verifier = buyersBalance; // Ensure this is an initialized contract instance
-        //   if (!verifier) {
-        //     console.error("Verifier contract instance is not set.");
-        //     return;
-        //   }
-
-        //   // const tx = await verifier.methods
-        //   //   .verifyTx(
-        //   //     proof.proof,
-        //   //     proof.inputs
-        //   //   )
-        //   // const result = await verifier.methods
-        //   //   .verifyTx(proof.inputs, proof.proof)
-        //   //   .call();
-        //   const tx = {
-        //     from: account,
-        //     to: buyersBalance.options.address,
-        //     data: buyersBalance.methods.verifyTx(
-        //       {
-        //         a: proof.proof.a, // ✅ Struct format is correct
-        //         b: proof.proof.b,
-        //         c: proof.proof.c
-        //       },
-        //       proof.inputs // ✅ Ensure this is an array of length 3
-        //     ).encodeABI(),
-        //     gas: 3000000,
-        //   };
-
-        //   const result = await web3.eth.sendTransaction(tx);
-        //   console.log("Proof verification transaction sent:", result);
-
-        // console.log("Proof verified successfully:", tx);
-      } catch (error) {
-        console.error("Error verifying proof:", error);
-      }
-    });
+  
+      // Compute witness
+      const { witness, output } = await zokratesProvider.computeWitness(
+        artifacts,
+        [balance, totalBidCost]
+      );
+      console.log("Witness:", witness);
+      console.log("Output:", output);
+  
+      // Generate proof using the proving key
+      const proof = await zokratesProvider.generateProof(
+        artifacts.program,
+        witness,
+        provingKey
+      );
+      console.log("Generated Proof:", proof);
+  
+      // Get the buyersBalance contract instance (Make sure this contract is already imported)
+      const buyersBalanceContract = buyersBalance; // Assuming buyersBalance is already imported
+  
+      // Estimate gas for verifying the proof
+      const gasPrice = await web3.eth.getGasPrice();
+      console.log("Current gas price:", gasPrice);
+  
+      const balance_ = await web3.eth.getBalance(account);
+      console.log("Account balance:", web3.utils.fromWei(balance_, "ether"), "ETH");
+  
+      // Estimate gas for the transaction
+      const gasEstimate = await buyersBalanceContract.methods
+        .verifyTx(proof.proof, proof.inputs)
+        .estimateGas({ from: account });
+  
+      console.log("Estimated gas:", gasEstimate);
+  
+      // Add buffer to gas estimate
+      const gasLimit = Math.ceil(Number(gasEstimate) * 1.2); // 20% buffer
+      const totalCost = BigInt(gasPrice) * BigInt(gasLimit);
+      console.log("Total gas cost in wei:", totalCost.toString());
+  
+      // Verify proof transaction
+      const result = await buyersBalanceContract.methods
+        .verifyTx(proof.proof, proof.inputs)
+        .call({ from: account });
+  
+      console.log("Proof verification result:", result);
+      return result; // Return the result of the proof verification (true/false)
+    } catch (error) {
+      console.error("Error verifying proof:", error);
+      return false; // If there's an error, return false
+    }
   };
+  
 
   const updateWalletBalance = async () => {
     try {
@@ -445,6 +323,20 @@ export default function VendingMachine() {
         setAccount(account);
 
         const networkId = await web3Instance.eth.net.getId();
+        // if (networkId !== 1337) {
+        //   try {
+        //     await window.ethereum.request({
+        //       method: "wallet_switchEthereumChain",
+        //       params: [{ chainId: "0x539" }], // 1337 in hex
+        //     });
+        //     setError(null);
+        //   } catch (switchError) {
+        //     console.error("Error switching network:", switchError);
+        //     setError("Please switch to Ganache manually.");
+        //   }
+        //   return;
+        // }
+        //TODO
         if (networkId !== 11155111n) {
           setError("Please connect to Sepolia network.");
           return;
@@ -500,48 +392,68 @@ export default function VendingMachine() {
     }
 
     try {
-      // Fetch user balance in contract before withdrawal
-      const balanceWei = await executeEnergy.methods.getBalance(account).call();
-      const balanceETH = web3.utils.fromWei(balanceWei, "ether");
+      // 1. Check user balance in balances mapping
+      const userBalanceInMapping = await executeEnergy.methods
+        .balances(account)
+        .call();
+      console.log(
+        "1. Balance in mapping:",
+        web3.utils.fromWei(userBalanceInMapping, "ether"),
+        "ETH"
+      );
 
-      console.log(`User Contract Balance: ${balanceETH} ETH`);
-
-      // Prevent transaction if balance is 0
-      if (parseFloat(balanceETH) === 0) {
-        setError("Insufficient funds in contract to withdraw.");
-        return;
-      }
-
-      // Fetch the contract's total ETH balance
-      const contractBalanceWei = await web3.eth.getBalance(
+      // 2. Check contract's actual ETH balance
+      const contractETH = await web3.eth.getBalance(
         executeEnergy.options.address
       );
-      const contractBalanceETH = web3.utils.fromWei(
-        contractBalanceWei,
-        "ether"
+      console.log(
+        "2. Contract ETH balance:",
+        web3.utils.fromWei(contractETH, "ether"),
+        "ETH"
       );
 
-      console.log(`Contract ETH Balance: ${contractBalanceETH} ETH`);
-
-      // Prevent transaction if contract itself has insufficient ETH
-      if (parseFloat(contractBalanceETH) < parseFloat(balanceETH)) {
-        setError("Contract does not have enough ETH to process withdrawal.");
+      // 3. Compare balances
+      if (BigInt(contractETH) < BigInt(userBalanceInMapping)) {
+        console.error("Contract has insufficient ETH to process withdrawal");
+        setError("Contract has insufficient funds");
         return;
       }
 
-      // Execute withdrawal transaction
-      const transaction = await executeEnergy.methods.withdrawFunds().send({
-        from: account,
-        gas: 3000000,
-      });
+      // 4. Verify caller is the same as msg.sender
+      const accounts = await web3.eth.getAccounts();
+      console.log("3. Connected account:", account);
+      console.log("4. First account:", accounts[0]);
 
-      console.log("Withdraw Transaction Hash:", transaction.transactionHash);
+      if (account.toLowerCase() !== accounts[0].toLowerCase()) {
+        console.error("Account mismatch");
+        setError("Connected account doesn't match sender");
+        return;
+      }
 
-      // Refresh user balance after withdrawal
-      await getContractBalance();
+      // 5. Attempt withdrawal with detailed error logging
+      try {
+        const tx = await executeEnergy.methods.withdrawFunds().send({
+          from: account,
+          gas: 60000,
+          gasPrice: await web3.eth.getGasPrice(),
+        });
+
+        console.log("Withdrawal successful:", tx.transactionHash);
+        return tx;
+      } catch (txError) {
+        // Log detailed transaction error
+        console.error("Transaction failed:", {
+          error: txError,
+          userBalance: userBalanceInMapping,
+          contractBalance: contractETH,
+          account: account,
+        });
+        throw txError;
+      }
     } catch (err) {
-      console.error("Error withdrawing funds:", err);
-      setError(err.message || "Withdrawal failed");
+      console.error("Withdrawal error:", err);
+      setError(err.message);
+      throw err;
     }
   };
 
@@ -549,9 +461,9 @@ export default function VendingMachine() {
     console.log(depositAmount);
     console.log("Depositing amount:", amountInWei);
     try {
-      const accounts = await web3.eth.getAccounts();
-      const sender = accounts[0];
-
+      // const accounts = await web3.eth.getAccounts();
+      // const sender = accounts[0];
+      const sender = account;
       // Get the function data for depositFunds
       const data = executeEnergy.methods.depositFunds().encodeABI();
 
@@ -559,7 +471,7 @@ export default function VendingMachine() {
         from: sender,
         to: executeEnergy.options.address,
         value: amountInWei,
-        gas: 3000000,
+        gas: 200000,
         data: data, // Include the encoded function call data
       };
 
@@ -583,57 +495,66 @@ export default function VendingMachine() {
       setError("Web3 or account not initialized. Please connect your wallet.");
       return;
     }
-
+  
     try {
       const accounts = await web3.eth.getAccounts();
       const account = accounts[0];
-
-      console.log(amount * price);
-      //{ ZOKRATES }------------------------------
-      console.log(
-        web3.utils.toWei(walletBalance.toString(), "ether"), // Convert walletBalance to Wei
-        web3.utils.toWei((amount * price).toString(), "ether")
-      );
-      buyersBalanceVerifier(
-        web3.utils.toWei(walletBalance.toString(), "ether"), // Convert walletBalance to Wei
-        web3.utils.toWei((amount * price).toString(), "ether") // Convert total cost to Wei
-      );
-      //{ZOKRATES}--------------------------------
-      const transaction = {
-        from: account,
-        to: closebid.options.address,
-        data: closebid.methods
-          .placeBid(
-            amount,
-            web3.utils.toWei(price.toString(), "ether"),
-            Boolean(isProducer)
-          )
-          .encodeABI(),
-        gas: 2000000,
-      };
-      const result = await web3.eth.sendTransaction(transaction);
-      setLastBid({
-        amount,
-        price,
-        timestamp: new Date().toLocaleString(),
-        type: isProducer,
-      });
-      setTotalBids((prev) => ({
-        count: prev.count + 1,
-        volume: prev.volume + parseInt(amount),
-      }));
-      console.log("Bid placed successfully:", result);
-
-      // depositFunds(web3.utils.toWei((amount * price).toString(), "ether"));
-
-      createTransaction(amount, price, isProducer ? "sell" : "buy");
-
-      return result;
+  
+      // Fetch wallet balance
+      const walletBalance = await web3.eth.getBalance(account);
+      const totalBidCost = amount * price;
+  
+      // Convert wallet balance and total bid cost to Wei
+      const walletBalanceWei = walletBalance.toString() /* web3.utils.toWei(walletBalance.toString(), "ether") */;
+      const totalBidCostWei = web3.utils.toWei(totalBidCost.toString(), "ether");
+      // totalBidCost= BigInt(walletBalanceWei);
+      console.log("str",totalBidCost.toString());
+      console.log(walletBalanceWei,totalBidCostWei);
+      // Verify the buyer's balance
+      const proofValid = await buyersBalanceVerifier(walletBalanceWei, totalBidCostWei);
+      if (proofValid) {
+        console.log("Proof verified successfully!");
+  
+        // Place the bid after successful verification
+        const transaction = {
+          from: account,
+          to: closebid.options.address,
+          data: closebid.methods
+            .placeBid(amount, web3.utils.toWei(price.toString(), "ether"), Boolean(isProducer))
+            .encodeABI(),
+          gas: 200000,
+        };
+  
+        const result = await web3.eth.sendTransaction(transaction);
+  
+        setLastBid({
+          amount,
+          price,
+          timestamp: new Date().toLocaleString(),
+          type: isProducer,
+        });
+  
+        setTotalBids((prev) => ({
+          count: prev.count + 1,
+          volume: prev.volume + parseInt(amount),
+        }));
+  
+        console.log("Bid placed successfully:", result);
+  
+        createTransaction(amount, price, isProducer ? "sell" : "buy");
+  
+        return result;
+      } else {
+        console.log("Proof verification failed. Insufficient funds or invalid proof.");
+        setError("Proof verification failed. You cannot place this bid.");
+        return;
+      }
     } catch (err) {
       console.error("Error placing bid:", err);
       setError(err instanceof Error ? err.message : String(err));
     }
   }
+  
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -873,7 +794,7 @@ export default function VendingMachine() {
         from: sender,
         to: executeEnergy.options.address,
         // value: amountInWei,
-        gas: 3000000,
+        gas: 200000,
         data: data, // Include the encoded function call data
       };
 

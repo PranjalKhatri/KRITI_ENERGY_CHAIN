@@ -83,8 +83,8 @@ const CONTRACT_ABI = [
 		"stateMutability": "view",
 		"type": "function"
 	}
-];
-const CONTRACT_ADDRESS = "0x8924928053652B51d70290915b5Ff3A03b374ABd";
+]
+const CONTRACT_ADDRESS = "0x0F8EC37Fc5cea71976bF2FdF6826eaB0983B208F";
 
 // Initialize Web3 and contract
 const initializeContract = () => {

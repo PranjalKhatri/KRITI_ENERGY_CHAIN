@@ -238,7 +238,7 @@ const CONTRACT_ABI = [
     type: "function",
   },
 ];
-const CONTRACT_ADDRESS = "0x033776979eb29774D4E9C4FE471f2Eb5980A0C98";
+const CONTRACT_ADDRESS = "0x033776979eb29774D4E9C4FE471f2Eb5980A0C98";/*0x9e48e27b1dd063244356dFa22031A59c647eF989 */
 
 // Initialize Web3 and contract
 const initializeContract = () => {

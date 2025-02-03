@@ -249,7 +249,7 @@ const CONTRACT_ABI = [
 ];
 
 // Contract address
-const CONTRACT_ADDRESS = '0xAF8488d3cCAeF107D2Eb801F384488031ECd0627';
+const CONTRACT_ADDRESS = '0xAF8488d3cCAeF107D2Eb801F384488031ECd0627';//0x80Fd86D06c08C6405b047F54A878bcce693fAED7
 
 // Initialize Web3 and contract
 const initializeContract = () => {
