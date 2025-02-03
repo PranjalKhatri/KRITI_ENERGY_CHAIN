@@ -169,30 +169,82 @@ contract EnergyExchange {
         return dsoFunctionCalls[user];
     }
 
-    
+    function _quickSortAscending(IClosedBid.Participant[] memory arr, int left, int right) internal pure {
+    if (left < right) {
+        int pivotIndex = _partitionAscending(arr, left, right);
+        _quickSortAscending(arr, left, pivotIndex - 1);
+        _quickSortAscending(arr, pivotIndex + 1, right);
+    }
+}
 
-
-    function _sortAscending(IClosedBid.Participant[] memory arr) internal pure {
-        uint256 n = arr.length;
-        for (uint256 i = 0; i < n; i++) {
-            for (uint256 j = i + 1; j < n; j++) {
-                if (arr[i].price > arr[j].price) {
-                    (arr[i], arr[j]) = (arr[j], arr[i]);
-                }
+    function _partitionAscending(IClosedBid.Participant[] memory arr, int left, int right) internal pure returns (int) {
+        uint pivot = arr[uint(right)].price;
+        int i = left - 1;
+        for (int j = left; j < right; j++) {
+            if (arr[uint(j)].price < pivot) {
+                i++;
+                (arr[uint(i)], arr[uint(j)]) = (arr[uint(j)], arr[uint(i)]);
             }
         }
+        (arr[uint(i + 1)], arr[uint(right)]) = (arr[uint(right)], arr[uint(i + 1)]);
+        return i + 1;
+    }
+
+    function _sortAscending(IClosedBid.Participant[] memory arr) internal pure {
+        if (arr.length > 1) {
+            _quickSortAscending(arr, 0, int(arr.length) - 1);
+        }
+    }
+
+    function _quickSortDescending(IClosedBid.Participant[] memory arr, int left, int right) internal pure {
+        if (left < right) {
+            int pivotIndex = _partitionDescending(arr, left, right);
+            _quickSortDescending(arr, left, pivotIndex - 1);
+            _quickSortDescending(arr, pivotIndex + 1, right);
+        }
+    }
+
+    function _partitionDescending(IClosedBid.Participant[] memory arr, int left, int right) internal pure returns (int) {
+        uint pivot = arr[uint(right)].price;
+        int i = left - 1;
+        for (int j = left; j < right; j++) {
+            if (arr[uint(j)].price > pivot) { // Reverse condition for descending order
+                i++;
+                (arr[uint(i)], arr[uint(j)]) = (arr[uint(j)], arr[uint(i)]);
+            }
+        }
+        (arr[uint(i + 1)], arr[uint(right)]) = (arr[uint(right)], arr[uint(i + 1)]);
+        return i + 1;
     }
 
     function _sortDescending(IClosedBid.Participant[] memory arr) internal pure {
-        uint256 n = arr.length;
-        for (uint256 i = 0; i < n; i++) {
-            for (uint256 j = i + 1; j < n; j++) {
-                if (arr[i].price < arr[j].price) {
-                    (arr[i], arr[j]) = (arr[j], arr[i]);
-                }
-            }
+        if (arr.length > 1) {
+            _quickSortDescending(arr, 0, int(arr.length) - 1);
         }
     }
+
+
+    // function _sortAscending(IClosedBid.Participant[] memory arr) internal pure {
+    //     uint256 n = arr.length;
+    //     for (uint256 i = 0; i < n; i++) {
+    //         for (uint256 j = i + 1; j < n; j++) {
+    //             if (arr[i].price > arr[j].price) {
+    //                 (arr[i], arr[j]) = (arr[j], arr[i]);
+    //             }
+    //         }
+    //     }
+    // }
+
+    // function _sortDescending(IClosedBid.Participant[] memory arr) internal pure {
+    //     uint256 n = arr.length;
+    //     for (uint256 i = 0; i < n; i++) {
+    //         for (uint256 j = i + 1; j < n; j++) {
+    //             if (arr[i].price < arr[j].price) {
+    //                 (arr[i], arr[j]) = (arr[j], arr[i]);
+    //             }
+    //         }
+    //     }
+    // }
 
     function _min(uint256 a, uint256 b) internal pure returns (uint256) {
         return (a < b) ? a : b;
