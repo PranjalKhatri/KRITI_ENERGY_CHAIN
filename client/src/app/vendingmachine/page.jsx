@@ -144,18 +144,18 @@ export default function VendingMachine() {
     try {
       // Initialize ZoKrates provider
       const zokratesProvider = await initialize();
-  
+
       const artifacts = await loadArtifacts("buyersbalance/Buyersbalance_out");
       const provingKey = await loadProvingKey("buyersbalance/proving.key");
-  
+
       if (!artifacts || !provingKey) {
         console.error("Failed to load artifacts or proving key.");
         return false; // Return false if artifacts or proving key are not found
       }
-  
+
       console.log("Artifacts:", artifacts);
       console.log("Proving Key:", provingKey);
-  
+
       // Compute witness
       const { witness, output } = await zokratesProvider.computeWitness(
         artifacts,
@@ -163,7 +163,7 @@ export default function VendingMachine() {
       );
       console.log("Witness:", witness);
       console.log("Output:", output);
-  
+
       // Generate proof using the proving key
       const proof = await zokratesProvider.generateProof(
         artifacts.program,
@@ -171,34 +171,38 @@ export default function VendingMachine() {
         provingKey
       );
       console.log("Generated Proof:", proof);
-  
+
       // Get the buyersBalance contract instance (Make sure this contract is already imported)
       const buyersBalanceContract = buyersBalance; // Assuming buyersBalance is already imported
-  
+
       // Estimate gas for verifying the proof
       const gasPrice = await web3.eth.getGasPrice();
       console.log("Current gas price:", gasPrice);
-  
+
       const balance_ = await web3.eth.getBalance(account);
-      console.log("Account balance:", web3.utils.fromWei(balance_, "ether"), "ETH");
-  
+      console.log(
+        "Account balance:",
+        web3.utils.fromWei(balance_, "ether"),
+        "ETH"
+      );
+
       // Estimate gas for the transaction
       const gasEstimate = await buyersBalanceContract.methods
         .verifyTx(proof.proof, proof.inputs)
         .estimateGas({ from: account });
-  
+
       console.log("Estimated gas:", gasEstimate);
-  
+
       // Add buffer to gas estimate
       const gasLimit = Math.ceil(Number(gasEstimate) * 1.2); // 20% buffer
       const totalCost = BigInt(gasPrice) * BigInt(gasLimit);
       console.log("Total gas cost in wei:", totalCost.toString());
-  
+
       // Verify proof transaction
       const result = await buyersBalanceContract.methods
         .verifyTx(proof.proof, proof.inputs)
         .call({ from: account });
-  
+
       console.log("Proof verification result:", result);
       return result; // Return the result of the proof verification (true/false)
     } catch (error) {
@@ -206,7 +210,6 @@ export default function VendingMachine() {
       return false; // If there's an error, return false
     }
   };
-  
 
   const updateWalletBalance = async () => {
     try {
@@ -413,11 +416,12 @@ export default function VendingMachine() {
       );
 
       // 3. Compare balances
-      if (BigInt(contractETH) < BigInt(userBalanceInMapping)) {
-        console.error("Contract has insufficient ETH to process withdrawal");
-        setError("Contract has insufficient funds");
-        return;
-      }
+
+      // if (BigInt(contractETH) < BigInt(userBalanceInMapping)) {
+      //   console.error("Contract has insufficient ETH to process withdrawal");
+      //   setError("Contract has insufficient funds");
+      //   return;
+      // }
 
       // 4. Verify caller is the same as msg.sender
       const accounts = await web3.eth.getAccounts();
@@ -434,8 +438,8 @@ export default function VendingMachine() {
       try {
         const tx = await executeEnergy.methods.withdrawFunds().send({
           from: account,
-          gas: 60000,
-          gasPrice: await web3.eth.getGasPrice(),
+          // gas: 60000,
+          // gasPrice: await web3.eth.getGasPrice(),
         });
 
         console.log("Withdrawal successful:", tx.transactionHash);
@@ -495,57 +499,70 @@ export default function VendingMachine() {
       setError("Web3 or account not initialized. Please connect your wallet.");
       return;
     }
-  
+
     try {
       const accounts = await web3.eth.getAccounts();
       const account = accounts[0];
-  
+
       // Fetch wallet balance
       const walletBalance = await web3.eth.getBalance(account);
       const totalBidCost = amount * price;
-  
+
       // Convert wallet balance and total bid cost to Wei
-      const walletBalanceWei = walletBalance.toString() /* web3.utils.toWei(walletBalance.toString(), "ether") */;
-      const totalBidCostWei = web3.utils.toWei(totalBidCost.toString(), "ether");
+      const walletBalanceWei =
+        walletBalance.toString(); /* web3.utils.toWei(walletBalance.toString(), "ether") */
+      const totalBidCostWei = web3.utils.toWei(
+        totalBidCost.toString(),
+        "ether"
+      );
       // totalBidCost= BigInt(walletBalanceWei);
-      console.log("str",totalBidCost.toString());
-      console.log(walletBalanceWei,totalBidCostWei);
+      console.log("str", totalBidCost.toString());
+      console.log(walletBalanceWei, totalBidCostWei);
       // Verify the buyer's balance
-      const proofValid = await buyersBalanceVerifier(walletBalanceWei, totalBidCostWei);
+      const proofValid = await buyersBalanceVerifier(
+        walletBalanceWei,
+        totalBidCostWei
+      );
       if (proofValid) {
         console.log("Proof verified successfully!");
-  
+
         // Place the bid after successful verification
         const transaction = {
           from: account,
           to: closebid.options.address,
           data: closebid.methods
-            .placeBid(amount, web3.utils.toWei(price.toString(), "ether"), Boolean(isProducer))
+            .placeBid(
+              amount,
+              web3.utils.toWei(price.toString(), "ether"),
+              Boolean(isProducer)
+            )
             .encodeABI(),
           gas: 200000,
         };
-  
+
         const result = await web3.eth.sendTransaction(transaction);
-  
+
         setLastBid({
           amount,
           price,
           timestamp: new Date().toLocaleString(),
           type: isProducer,
         });
-  
+
         setTotalBids((prev) => ({
           count: prev.count + 1,
           volume: prev.volume + parseInt(amount),
         }));
-  
+
         console.log("Bid placed successfully:", result);
-  
+
         createTransaction(amount, price, isProducer ? "sell" : "buy");
-  
+
         return result;
       } else {
-        console.log("Proof verification failed. Insufficient funds or invalid proof.");
+        console.log(
+          "Proof verification failed. Insufficient funds or invalid proof."
+        );
         setError("Proof verification failed. You cannot place this bid.");
         return;
       }
@@ -554,7 +571,6 @@ export default function VendingMachine() {
       setError(err instanceof Error ? err.message : String(err));
     }
   }
-  
 
   const handleSubmit = async (e) => {
     e.preventDefault();
