@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Web3 from "web3";
 import {
+  RefreshCcw,
   Wallet,
   Battery,
   BatteryCharging,
@@ -46,7 +47,8 @@ export default function VendingMachine() {
   const [isDeposit, setIsDeposit] = useState(true);
   const [depositAmount, setDepositAmount] = useState(0);
   const [tradingMode, setTradingMode] = useState("p2p"); // "p2p" or "dso"
-
+  const [contractBalance, setContractBalance] = useState(0);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
   useEffect(() => {
     getInventoryHandler();
     if (account && web3) {
@@ -83,6 +85,8 @@ export default function VendingMachine() {
 
     const fetchBalance = async () => {
       updateWalletBalance();
+      getContractBalance();
+      console.log("Updated Balance:", walletBalance);
       // const consumerBalance = await getContractBalance();
       // console.log("Updated Balance:", consumerBalance);
     };
@@ -211,6 +215,77 @@ export default function VendingMachine() {
     }
   };
 
+  const energyReserveVerifier = async (balance, totalBidCost) => {
+    try {
+      // Initialize ZoKrates provider
+      const zokratesProvider = await initialize();
+
+      const artifacts = await loadArtifacts("buyersbalance/Buyersbalance_out");
+      const provingKey = await loadProvingKey("buyersbalance/proving.key");
+
+      if (!artifacts || !provingKey) {
+        console.error("Failed to load artifacts or proving key.");
+        return false; // Return false if artifacts or proving key are not found
+      }
+
+      console.log("Artifacts:", artifacts);
+      console.log("Proving Key:", provingKey);
+
+      // Compute witness
+      const { witness, output } = await zokratesProvider.computeWitness(
+        artifacts,
+        [balance, totalBidCost]
+      );
+      console.log("Witness:", witness);
+      console.log("Output:", output);
+
+      // Generate proof using the proving key
+      const proof = await zokratesProvider.generateProof(
+        artifacts.program,
+        witness,
+        provingKey
+      );
+      console.log("Generated Proof:", proof);
+
+      // Get the buyersBalance contract instance (Make sure this contract is already imported)
+      const buyersBalanceContract = buyersBalance; // Assuming buyersBalance is already imported
+
+      // Estimate gas for verifying the proof
+      const gasPrice = await web3.eth.getGasPrice();
+      console.log("Current gas price:", gasPrice);
+
+      const balance_ = await web3.eth.getBalance(account);
+      console.log(
+        "Account balance:",
+        web3.utils.fromWei(balance_, "ether"),
+        "ETH"
+      );
+
+      // Estimate gas for the transaction
+      const gasEstimate = await buyersBalanceContract.methods
+        .verifyTx(proof.proof, proof.inputs)
+        .estimateGas({ from: account });
+
+      console.log("Estimated gas:", gasEstimate);
+
+      // Add buffer to gas estimate
+      const gasLimit = Math.ceil(Number(gasEstimate) * 1.2); // 20% buffer
+      const totalCost = BigInt(gasPrice) * BigInt(gasLimit);
+      console.log("Total gas cost in wei:", totalCost.toString());
+
+      // Verify proof transaction
+      const result = await buyersBalanceContract.methods
+        .verifyTx(proof.proof, proof.inputs)
+        .call({ from: account });
+
+      console.log("Proof verification result:", result);
+      return result; // Return the result of the proof verification (true/false)
+    } catch (error) {
+      console.error("Error verifying proof:", error);
+      return false; // If there's an error, return false
+    }
+  };
+
   const updateWalletBalance = async () => {
     try {
       const balance = await web3.eth.getBalance(account);
@@ -227,8 +302,8 @@ export default function VendingMachine() {
       // 🔹 Create a user if they don't exist
       await axios.post(`http://localhost:8000/api/v1/users/create`, {
         accountNumber: userId, // Assuming `userId` is the account number
-        name: "Pranjal", // You might need to get this dynamically
-        email: `pranjal@gmail.com`, // Provide a default email
+        name: "Pranjalanna", // You might need to get this dynamically
+        email: `${userId}@energychain.com`, // Provide a default email
       });
     } catch (err) {
       console.log("Error in user (duplication probably)");
@@ -283,9 +358,9 @@ export default function VendingMachine() {
 
   const getInventoryHandler = async () => {
     try {
-      const inventory = await vmContract.methods.message().call();
-      setInventory(inventory);
-      console.log("Inventory:", inventory);
+      // const inventory = await vmContract.methods.message().call();
+      // setInventory(inventory);
+      // console.log("Inventory:", inventory);
     } catch (err) {
       console.error(err.message);
       setError(err instanceof Error ? err.message : String(err));
@@ -300,14 +375,17 @@ export default function VendingMachine() {
     }
 
     try {
-      // Correct call without gas or encodeABI()
-      const balance = await executeEnergy.methods.getBalance(account).call();
-
+      const userBalanceInMapping = await executeEnergy.methods
+        .balances(account)
+        .call();
       console.log(
-        "User Contract Balance:",
-        web3.utils.fromWei(balance, "ether")
+        "User balance in mapping:",
+        web3.utils.fromWei(userBalanceInMapping, "ether")
       );
-      return web3.utils.fromWei(balance, "ether"); // Convert from Wei to ETH
+      setContractBalance(web3.utils.fromWei(userBalanceInMapping, "ether"));
+      // consolele
+      console.log("User balance in mapping:", userBalanceInMapping);
+      return web3.utils.fromWei(userBalanceInMapping, "ether"); // Convert from Wei to ETH
     } catch (err) {
       console.error("Error fetching contract balance:", err);
       setError(err instanceof Error ? err.message : String(err));
@@ -326,24 +404,25 @@ export default function VendingMachine() {
         setAccount(account);
 
         const networkId = await web3Instance.eth.net.getId();
-        // if (networkId !== 1337) {
-        //   try {
-        //     await window.ethereum.request({
-        //       method: "wallet_switchEthereumChain",
-        //       params: [{ chainId: "0x539" }], // 1337 in hex
-        //     });
-        //     setError(null);
-        //   } catch (switchError) {
-        //     console.error("Error switching network:", switchError);
-        //     setError("Please switch to Ganache manually.");
-        //   }
+        if (networkId !== 1337) {
+          try {
+            await window.ethereum.request({
+              method: "wallet_switchEthereumChain",
+              params: [{ chainId: "0x539" }], // 1337 in hex
+            });
+            console.log("Switched to Ganache network.");
+            setError(null);
+          } catch (switchError) {
+            console.error("Error switching network:", switchError);
+            setError("Please switch to Ganache manually.");
+          }
+          //   return;
+        }
+        //TODO
+        // if (networkId !== 11155111n) {
+        //   setError("Please connect to Sepolia network.");
         //   return;
         // }
-        //TODO
-        if (networkId !== 11155111n) {
-          setError("Please connect to Sepolia network.");
-          return;
-        }
         console.log("Account connected: ", account);
         fetchUserTransactions(account);
       } catch (err) {
@@ -395,68 +474,35 @@ export default function VendingMachine() {
     }
 
     try {
-      // 1. Check user balance in balances mapping
-      const userBalanceInMapping = await executeEnergy.methods
-        .balances(account)
-        .call();
-      console.log(
-        "1. Balance in mapping:",
-        web3.utils.fromWei(userBalanceInMapping, "ether"),
-        "ETH"
-      );
+      setIsWithdrawing(true);
+      // Check user balance in mapping
+      getContractBalance();
 
-      // 2. Check contract's actual ETH balance
+      // Check contract's ETH balance
       const contractETH = await web3.eth.getBalance(
         executeEnergy.options.address
       );
       console.log(
-        "2. Contract ETH balance:",
-        web3.utils.fromWei(contractETH, "ether"),
-        "ETH"
+        "Contract ETH balance:",
+        web3.utils.fromWei(contractETH, "ether")
       );
+      // setIsWithdrawing(true);
+      // Use send method to directly call the withdrawal
+      const txReceipt = await executeEnergy.methods.withdrawFunds().send({
+        from: account,
+        // Optional: You can specify gas limit if needed
+        // gas: estimatedGas
+      });
 
-      // 3. Compare balances
-
-      // if (BigInt(contractETH) < BigInt(userBalanceInMapping)) {
-      //   console.error("Contract has insufficient ETH to process withdrawal");
-      //   setError("Contract has insufficient funds");
-      //   return;
-      // }
-
-      // 4. Verify caller is the same as msg.sender
-      const accounts = await web3.eth.getAccounts();
-      console.log("3. Connected account:", account);
-      console.log("4. First account:", accounts[0]);
-
-      if (account.toLowerCase() !== accounts[0].toLowerCase()) {
-        console.error("Account mismatch");
-        setError("Connected account doesn't match sender");
-        return;
-      }
-
-      // 5. Attempt withdrawal with detailed error logging
-      try {
-        const tx = await executeEnergy.methods.withdrawFunds().send({
-          from: account,
-          // gas: 60000,
-          // gasPrice: await web3.eth.getGasPrice(),
-        });
-
-        console.log("Withdrawal successful:", tx.transactionHash);
-        return tx;
-      } catch (txError) {
-        // Log detailed transaction error
-        console.error("Transaction failed:", {
-          error: txError,
-          userBalance: userBalanceInMapping,
-          contractBalance: contractETH,
-          account: account,
-        });
-        throw txError;
-      }
+      console.log("Withdrawal successful:", txReceipt.transactionHash);
+      setIsWithdrawing(false);
+      getContractBalance();
+      updateWalletBalance();
+      return txReceipt;
     } catch (err) {
       console.error("Withdrawal error:", err);
       setError(err.message);
+      setIsWithdrawing(false);
       throw err;
     }
   };
@@ -519,10 +565,14 @@ export default function VendingMachine() {
       console.log("str", totalBidCost.toString());
       console.log(walletBalanceWei, totalBidCostWei);
       // Verify the buyer's balance
-      const proofValid = await buyersBalanceVerifier(
-        walletBalanceWei,
-        totalBidCostWei
-      );
+      let proofValid = true;
+      if (isProducer == 0) {
+        proofValid = await buyersBalanceVerifier(
+          walletBalanceWei,
+          totalBidCostWei
+        );
+      }
+      // const proofValid = true;
       if (proofValid) {
         console.log("Proof verified successfully!");
 
@@ -687,7 +737,43 @@ export default function VendingMachine() {
             </div>
           </div>
         </div>
-
+        {/* Contract Funds Box */}
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">
+                Contract Funds
+              </h2>
+              <div className="text-3xl font-bold text-emerald-600">
+                {contractBalance} ETH
+              </div>
+            </div>
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                withdrawFunds();
+              }}
+              disabled={
+                isWithdrawing || !contractBalance || contractBalance <= 0
+              }
+              className={`px-6 py-3 rounded-lg font-semibold text-white transition-colors
+                ${
+                  isWithdrawing || !contractBalance || contractBalance <= 0
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : "bg-emerald-600 hover:bg-emerald-700"
+                }`}
+            >
+              {isWithdrawing ? (
+                <span className="flex items-center">
+                  <RefreshCcw className="w-4 h-4 mr-2 animate-spin" />
+                  Withdrawing...
+                </span>
+              ) : (
+                "Withdraw Funds"
+              )}
+            </button>
+          </div>
+        </div>
         {/* Transactions Table */}
         <div className="bg-white rounded-xl shadow-lg p-6">
           <h2 className="text-xl font-bold text-gray-900 mb-4">Transactions</h2>
@@ -747,20 +833,27 @@ export default function VendingMachine() {
       setError("Web3 or account not initialized. Please connect your wallet.");
       return;
     }
-    // const price =
-    try {
-      const accounts = await web3.eth.getAccounts();
-      const account = accounts[0];
-      // console.log("Total cost in ETH:", amount * price);
 
+    try {
+      // Ensure account is retrieved correctly
+      const accounts = await web3.eth.getAccounts();
+      const currentAccount = accounts[0]; // Use current account
+
+      // Estimate gas for the transaction
+      const gasEstimate = await executeEnergy.methods
+        .buyEnergyFromDSO(energyAmount)
+        .estimateGas({ from: currentAccount });
+      console.log("Gas estimate:", gasEstimate);
+      // Prepare the transaction
       const transaction = {
-        from: account,
+        from: currentAccount,
         to: executeEnergy.options.address,
         data: executeEnergy.methods.buyEnergyFromDSO(energyAmount).encodeABI(),
-        gas: 2000000,
-        value: energyAmount,
+        gas: gasEstimate, // Use the estimated gas
+        value: web3.utils.toWei(energyAmount.toString(), "ether"), // Convert energyAmount to Wei if needed
       };
 
+      // Send the transaction
       const result = await web3.eth.sendTransaction(transaction);
       console.log("Energy purchase successful:", result);
 
@@ -770,6 +863,7 @@ export default function VendingMachine() {
       setError(err instanceof Error ? err.message : String(err));
     }
   };
+
   const SellToDSO = async (energyAmount) => {
     if (!web3 || !account) {
       setError("Web3 or account not initialized. Please connect your wallet.");
@@ -798,7 +892,7 @@ export default function VendingMachine() {
       setError(err instanceof Error ? err.message : String(err));
     }
   };
-  const gimmeMoney = async () => {
+  const executeEnergyExchangeFROMcontract = async () => {
     try {
       const accounts = await web3.eth.getAccounts();
       const sender = accounts[0];
@@ -1254,7 +1348,17 @@ export default function VendingMachine() {
           <WalletPage />
         )}
       </main>
-      <button onClick={withdrawFunds}>EXECUTE ENERGY</button>
+      <button
+        onClick={(e) => {
+          e.preventDefault();
+          withdrawFunds;
+        }}
+      >
+        withdraw funds
+      </button>
+      <button onClick={executeEnergyExchangeFROMcontract}>
+        EXECUTE ENERGY exchange
+      </button>
     </div>
   );
 }

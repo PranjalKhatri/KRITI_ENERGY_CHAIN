@@ -365,12 +365,12 @@ const CONTRACT_ABI = [
 		"inputs": [],
 		"name": "withdrawFunds",
 		"outputs": [],
-		"stateMutability": "nonpayable",
+		"stateMutability": "payable",
 		"type": "function"
 	}
 ];
 
-const CONTRACT_ADDRESS = "0x8a83b043A3bEd0cDDAFC177752313bF2f7a11Cc8";
+const CONTRACT_ADDRESS = "0x58D9891E909b15F0c7e0eE94F46Acec2D72b1Ab4";
 
 // Initialize Web3 and contract
 const initializeContract = () => {
