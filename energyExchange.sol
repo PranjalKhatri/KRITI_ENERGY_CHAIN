@@ -1,4 +1,3 @@
-
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
@@ -20,7 +19,7 @@ contract EnergyExchange {
     
     mapping(address => uint256) public clearedEnergy;
     mapping(address => uint256) public balances;
-
+    mapping(address => uint256) public energyBalance;
     address payable public DSO;
     uint256 public DSOEnergy = 100000;
     uint256 public DSOETHBalance = 100000 ether;
@@ -144,6 +143,20 @@ contract EnergyExchange {
         IClosedBid.Participant[] memory producers = closedBidContract.getProducers();
         IClosedBid.Participant[] memory consumers = closedBidContract.getConsumers();
 
+        for (uint256 k = 0; k < producers.length; k++) 
+        {
+            if(energyBalance[producers[k].bidder] == 0){
+                energyBalance[producers[k].bidder] = 100;
+            }
+        }
+
+        for (uint256 k = 0; k < consumers.length; k++) 
+        {
+            if(energyBalance[consumers[k].bidder] == 0){
+                energyBalance[consumers[k].bidder] = 100;
+            }
+        }
+
         require(producers.length > 0 && consumers.length > 0, "No participants available");
 
         _sortAscending(producers);
@@ -185,6 +198,9 @@ contract EnergyExchange {
 
                 balances[consumer] -= totalCost;
                 balances[producer] += totalCost;
+
+                energyBalance[producer] -= clearAmount;
+                energyBalance[consumer] += clearAmount;
 
                 successfulTransactions.push(Transaction(producer, consumer, clearAmount, clearPrice));
                 
