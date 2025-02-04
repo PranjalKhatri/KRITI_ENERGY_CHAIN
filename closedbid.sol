@@ -1,4 +1,3 @@
-
 // pragma solidity ^0.8.20;
 
 // contract ClosedBid {
@@ -107,14 +106,23 @@ contract ClosedBid {
         }
     }
 
+    function clearParticipants() external {
+        for(uint256 i = 0; i < producers.length;i++){
+            delete  players[producers[i].bidder];
+        }
+        for(uint256 i = 0; i < consumers.length;i++){
+            delete  players[consumers[i].bidder];
+        }
+        delete producers; 
+        delete consumers; 
+        // delete players;
+    }
+
     function getProducers() external view returns (Participant[] memory) {
-        // returns array of producers
         return producers;
     }
 
     function getConsumers() external view returns (Participant[] memory) {
-        // returns array of consumers
         return consumers;
     }
 }
-
