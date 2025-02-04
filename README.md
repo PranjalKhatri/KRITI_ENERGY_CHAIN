@@ -59,8 +59,8 @@ By analyzing sensor data over time, algorithms can predict the availability and 
    - IoT and smart meters for real-time data collection
    - Energy consumption monitoring
 3. **Carbon Credit Trading System**
-   - Real-time verification and validation
-   - Prevention of fraud and double-spending
+   - Promoting Renewable Energy Producers by providing them carbon credits
+   - Penalising the Non-Renewable Energy Producers by taking carbon credits from them
 4. **Privacy & Security**
    - ZK-SNARKs for encrypted transactions
    - Data protection and access control
