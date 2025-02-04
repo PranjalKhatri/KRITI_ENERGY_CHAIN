@@ -3,16 +3,15 @@
 ## Overview
 The energy sector faces critical challenges, including energy security, energy equity, and environmental sustainability. Traditional energy systems suffer from monopolistic conditions, opaque carbon credit trading, and limited participation of small-scale renewable energy producers.
 
-This project leverages **blockchain technology enhanced with ZK-SNARKs** to enable transparent, secure, and decentralized peer-to-peer (P2P) energy trading. By integrating **smart meters, IoT devices, and smart contracts**, the system ensures **real-time verification, efficient energy distribution, and privacy-preserving transactions**.
+This project leverages **blockchain technology enhanced with ZK-SNARKs** to enable transparent, secure, and decentralized peer-to-peer (P2P) energy trading. By integrating **smart meters, IoT devices like sensors, and smart contracts**, the system ensures **real-time verification, efficient and sustainable energy distribution, and privacy-preserving transactions**.
 
-## Objectives
 The primary goals of this project are:
-- **Decentralized Energy Trading:** Enable prosumers to directly participate in energy markets using blockchain-based verification.
-- **Automated Carbon Credit Trading:** Develop a system with real-time verification to prevent double spending.
-- **Smart Contract-Based Settlements:** Implement automated trading and settlement mechanisms.
-- **IoT Integration:** Use smart meters to accurately monitor energy consumption.
-- **Scalability & Accessibility:** Reduce barriers for small-scale renewable energy producers.
-- **Privacy Protection:** Implement **ZK-SNARKs** to secure sensitive trading data.
+- **Decentralized Energy Trading:** Enabling prosumers to directly participate in energy markets using blockchain-based verification.
+- **Automated Carbon Credit Trading:** Promoting more and more sustainable producers.
+- **Smart Contract-Based Settlements:** Implementing automated trading and settlement mechanisms.
+- **IoT Integration:** Using smart meters to accurately monitor energy consumption and send signal to start the verification of Energy Transfer.
+- **Privacy Protection:** Implementing **ZK-SNARKs** to secure sensitive trading data and verify the energy transfer.
+- **Scalability & Accessibility:** Reducing barriers for small-scale renewable energy producers and ensuring profit of both the parties i.e., buyer and seller to ensure equitable market participation ensuring scalability of the model.
 
 ## Key Features
 - **Blockchain-Based Smart Grid:** Provides a transparent and immutable energy trading ecosystem.
