@@ -57,23 +57,27 @@ By analyzing sensor data over time, algorithms can predict the availability and 
 
 
 ## How to Run the Project
-1. **Install Dependencies**
+1. **Install Dependencies for Backend**
    ```bash
+   cd server/
    npm install
    ```
-2. **Deploy Smart Contracts**
+2. **Install Dependencies for Backend**
    ```bash
-   truffle migrate --network development
+   cd client/
+   npm install
    ```
 3. **Run the Backend**
    ```bash
-   node server.js
+   npm run dev
    ```
 4. **Start the Frontend**
    ```bash
-   npm start
+   npm run dev
    ```
-
+And there should be a .env file in client which should contain NEXT_PUBLIC_API_URL="http://127.0.0.1:7545"
+And there should be a .env file in server which should contain DB_URL=<your_mongo_db_url_test_database> and PORT=8000
+And you should have Ganache running in the background and metamask setup in Ganache
 
 
 
