@@ -32,9 +32,19 @@ The buyers and sellers, that is the prosumers, bid for the amount they want to b
 ### IoT and Smart Meter Integration
 Smart Meter sends meter readings to the server at a fixed time interval using NodeMCU. The system features an alerting system, a home automation unit, a forecasting system and an android application. The data collection unit comprises the power sensor which is used to measure consumption and a module comprising IR Sensors which we use for the home automation system. Firstly, user's consumption acquired by the power sensor is sent to the NodeMCU. The NodeMCU is used to send the data to the cloud. 
 
+
+![Project Logo](IoT_Architecture.jpg)
+
+
 The consumption pattern is monitored and when it surpasses the thresholds, alerts are sent to the user interface. The consumption pattern is displayed in the form of graphs and significant figures as texts for the user's review. The consumption pattern is also provided as an input for the Forecasting algorithm and the NodeMCU used for the home automation system. The IR Module is utilized for the home automation feature. A pair of IR Sensors are installed in the entrance of each room. The order in which the sensors sense human presence is noted for determining whether the user's entering or leaving the room. This information is sent to the NodeMCU which in turn sends it to the cloud.
 
 These values along with the consumption data are sent to the NodeMCU connected to the appliances. On receiving energy, a signal is again send so as to make sure that the energy is transferred from the seller to buyer.
+
+
+<p align="center">
+   <img src="IoT_flowchart.jpg">  
+</p>
+
 
 IoT sensors on solar panels can monitor sunlight exposure, temperature, and power generation, allowing for clear identification of a renewable source like solar energy. For wind energy, sensors can measure wind speed and direction, signifying a renewable source like wind power. Water flow and pressure sensors can monitor the source of hydropower, which is considered renewable. Temperature sensors can indicate the presence of geothermal energy, another renewable source. 
   
