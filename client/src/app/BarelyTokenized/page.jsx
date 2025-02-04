@@ -148,37 +148,39 @@ export default function VendingMachine() {
       // const isVerified = zokratesProvider.verify(keypair.vk, proof);
     });
   };
-  
+
   const setEnergyBalanceServer = async (amnt) => {
     console.log("Updating energy balance in server:", amnt);
 
     if (!account) {
-        console.error("Account is undefined. Cannot update energy.");
-        return false;
+      console.error("Account is undefined. Cannot update energy.");
+      return false;
     }
 
     let parsedAmount = Number(amnt);
-    if(parsedAmount == 0)parsedAmount=100;
+    if (parsedAmount == 0) parsedAmount = 100;
     if (isNaN(parsedAmount)) {
-        console.error("Invalid energy amount:", amnt);
-        return false;
+      console.error("Invalid energy amount:", amnt);
+      return false;
     }
 
     try {
-        const response = await axios.put(
-            `http://localhost:8000/api/v1/users/${account}/energy`, // API endpoint
-            { energy: parsedAmount }, // Send parsed number
-            { headers: { "Content-Type": "application/json" } } // Headers
-        );
+      const response = await axios.put(
+        `http://localhost:8000/api/v1/users/${account}/energy`, // API endpoint
+        { energy: parsedAmount }, // Send parsed number
+        { headers: { "Content-Type": "application/json" } } // Headers
+      );
 
-        console.log("Energy Updated Successfully:", response.data);
-        return response.data;
+      console.log("Energy Updated Successfully:", response.data);
+      return response.data;
     } catch (error) {
-        console.error("Error updating energy in Server:", error.response?.data || error.message);
-        return false;
+      console.error(
+        "Error updating energy in Server:",
+        error.response?.data || error.message
+      );
+      return false;
     }
-};
-
+  };
 
   const getEnergyBalanceFromContract = async () => {
     try {
@@ -186,7 +188,7 @@ export default function VendingMachine() {
         .energyBalance(account)
         .call();
       console.log("Energy Balance:", energyBalance);
-      if(parseInt(energyBalance) !== 0) {
+      if (parseInt(energyBalance) !== 0) {
         setCurrentEnergy(energyBalance);
         setEnergyBalanceServer(energyBalance);
       }
@@ -603,7 +605,7 @@ export default function VendingMachine() {
       console.log(walletBalanceWei, totalBidCostWei);
       // Verify the buyer's balance
       let proofValid = true;
-      /*if (isProducer == 0) {
+      if (isProducer == 0) {
         proofValid = await buyersBalanceVerifier(
           walletBalanceWei,
           totalBidCostWei
@@ -614,7 +616,7 @@ export default function VendingMachine() {
           currentEnergy.toString(),
           amount.toString()
         );
-      }*/
+      }
       // const proofValid = true;
       if (proofValid) {
         console.log("Proof verified successfully!");
@@ -940,7 +942,7 @@ export default function VendingMachine() {
         to: executeEnergy.options.address,
         data: executeEnergy.methods.buyEnergyFromDSO(energyAmount).encodeABI(),
         gas: gasEstimate, // Use the estimated gas
-        value: web3.utils.toWei(energyAmount.toString(), "ether"), // Convert energyAmount to Wei if needed
+        value: energyAmount + "", // Convert energyAmount to Wei if needed
       };
 
       // Send the transaction
@@ -1035,14 +1037,14 @@ export default function VendingMachine() {
   // }, 5000);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-teal-50 to-green-100">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800">
       {/* Header */}
-      <header className="bg-white shadow-sm">
+      <header className="bg-gray-800 border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-2">
-              <ArrowRightLeft className="h-6 w-6 text-teal-600" />
-              <h1 className="text-xl font-bold text-gray-900">
+              <ArrowRightLeft className="h-6 w-6 text-emerald-400" />
+              <h1 className="text-xl font-bold text-white">
                 Energy Trading Platform
               </h1>
             </div>
@@ -1052,8 +1054,8 @@ export default function VendingMachine() {
                   onClick={() => setCurrentPage("trading")}
                   className={`px-3 py-2 rounded-md text-sm font-medium ${
                     currentPage === "trading"
-                      ? "bg-gray-100 text-gray-900"
-                      : "text-gray-600 hover:text-gray-900"
+                      ? "bg-gray-700 text-white"
+                      : "text-gray-300 hover:text-white"
                   }`}
                 >
                   Trading
@@ -1062,8 +1064,8 @@ export default function VendingMachine() {
                   onClick={() => setCurrentPage("wallet")}
                   className={`px-3 py-2 rounded-md text-sm font-medium ${
                     currentPage === "wallet"
-                      ? "bg-gray-100 text-gray-900"
-                      : "text-gray-600 hover:text-gray-900"
+                      ? "bg-gray-700 text-white-900"
+                      : "text-gray-300 hover:text-white-900"
                   }`}
                 >
                   Wallet
@@ -1073,8 +1075,8 @@ export default function VendingMachine() {
                 onClick={connectWalletHandler}
                 className={`flex items-center space-x-2 px-4 py-2 rounded-lg ${
                   account
-                    ? "bg-teal-100 text-teal-700"
-                    : "bg-teal-600 text-white hover:bg-teal-700"
+                    ? "bg-emerald-900 text-emerald-200"
+                    : "bg-emerald-600 text-white hover:bg-emerald-700"
                 }`}
               >
                 <Wallet className="h-5 w-5" />
@@ -1121,13 +1123,13 @@ export default function VendingMachine() {
             {/* Trading Mode Selection */}
             {!role && (
               <div className="mb-8">
-                <div className="flex justify-center space-x-4 p-4 bg-white rounded-lg shadow-sm">
+                <div className="flex justify-center space-x-4 p-4 bg-gray-800 border-gray-700 rounded-lg shadow-sm">
                   <button
                     onClick={() => setTradingMode("p2p")}
                     className={`px-6 py-3 rounded-lg flex items-center space-x-2 ${
                       tradingMode === "p2p"
-                        ? "bg-teal-100 text-teal-800"
-                        : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+                        ? "bg-emerald-100 text-emerald-800"
+                        : "bg-gray-700 text-gray-600 hover:bg-gray-600"
                     }`}
                   >
                     <ArrowLeftRight className="h-5 w-5" />
@@ -1137,8 +1139,8 @@ export default function VendingMachine() {
                     onClick={() => setTradingMode("dso")}
                     className={`px-6 py-3 rounded-lg flex items-center space-x-2 ${
                       tradingMode === "dso"
-                        ? "bg-teal-100 text-teal-800"
-                        : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+                        ? "bg-emerald-100 text-emerald-800"
+                        : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                     }`}
                   >
                     <Building2 className="h-5 w-5" />
@@ -1153,21 +1155,21 @@ export default function VendingMachine() {
                 <button
                   onClick={() => setRole("buyer")}
                   disabled={!account}
-                  className={`flex flex-col items-center p-8 bg-white rounded-xl shadow-lg transition-all ${
+                  className={`flex flex-col items-center p-8 bg-gray rounded-xl shadow-lg transition-all ${
                     account
-                      ? "hover:shadow-xl cursor-pointer"
+                      ? "hover:bg-gray-700 cursor-pointer"
                       : "opacity-50 cursor-not-allowed"
                   }`}
                 >
-                  <Battery className="h-16 w-16 text-teal-600 mb-4" />
-                  <h2 className="text-2xl font-bold text-gray-900">
+                  <Battery className="h-16 w-16 text-emerald-600 mb-4" />
+                  <h2 className="text-2xl font-bold text-white-900">
                     Buy Energy
                   </h2>
                   <p className="mt-2 text-gray-600">
                     Purchase energy from sellers
                   </p>
                   {!account && (
-                    <p className="mt-2 text-sm text-red-500">
+                    <p className="mt-2 text-sm text-red-400">
                       Connect wallet to continue
                     </p>
                   )}
@@ -1176,14 +1178,14 @@ export default function VendingMachine() {
                 <button
                   onClick={() => setRole("seller")}
                   disabled={!account}
-                  className={`flex flex-col items-center p-8 bg-white rounded-xl shadow-lg transition-all ${
+                  className={`flex flex-col items-center p-8 bg-gray-800 rounded-xl shadow-lg transition-all ${
                     account
-                      ? "hover:shadow-xl cursor-pointer"
+                      ? "hover:bg-gray cursor-pointer"
                       : "opacity-50 cursor-not-allowed"
                   }`}
                 >
-                  <BatteryCharging className="h-16 w-16 text-teal-600 mb-4" />
-                  <h2 className="text-2xl font-bold text-gray-900">
+                  <BatteryCharging className="h-16 w-16 text-emerald-600 mb-4" />
+                  <h2 className="text-2xl font-bold text-white-900">
                     Sell Energy
                   </h2>
                   <p className="mt-2 text-gray-600">Sell your excess energy</p>
@@ -1198,9 +1200,9 @@ export default function VendingMachine() {
             {/* DSO Trading Interface */}
             {!role && tradingMode === "dso" && (
               <div className="grid md:grid-cols-2 gap-8 mt-8">
-                <div className="bg-white rounded-xl shadow-lg p-8">
+                <div className="bg-gray-800 rounded-xl shadow-lg p-8">
                   <div className="text-center mb-6">
-                    <Building2 className="h-16 w-16 text-teal-600 mx-auto mb-4" />
+                    <Building2 className="h-16 w-16 text-emerald-600 mx-auto mb-4" />
                     <h2 className="text-2xl font-bold text-gray-900">
                       Buy from DSO
                     </h2>
@@ -1223,7 +1225,7 @@ export default function VendingMachine() {
                         type="number"
                         value={buyAmount}
                         onChange={(e) => setBuyAmount(e.target.value)}
-                        className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2"
+                        className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 bg-white dark:bg-gray-900"
                         placeholder="Enter amount to buy"
                         required
                       />
@@ -1238,7 +1240,7 @@ export default function VendingMachine() {
                   </form>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-lg p-8">
+                <div className="bg-gray rounded-xl shadow-lg p-8">
                   <div className="text-center mb-6">
                     <Building2 className="h-16 w-16 text-teal-600 mx-auto mb-4" />
                     <h2 className="text-2xl font-bold text-gray-900">
@@ -1263,7 +1265,7 @@ export default function VendingMachine() {
                         type="number"
                         value={sellAmount}
                         onChange={(e) => setSellAmount(e.target.value)}
-                        className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2"
+                        className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 bg-white dark:bg-gray-900"
                         placeholder="Enter amount to sell"
                         required
                       />
@@ -1285,9 +1287,9 @@ export default function VendingMachine() {
               <div className="max-w-2xl mx-auto">
                 {account && lastBid && <BidHistory />}
 
-                <div className="bg-white rounded-xl shadow-lg p-6">
+                <div className="bg-gray rounded-xl shadow-lg p-6">
                   <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-2xl font-bold text-gray-900">
+                    <h2 className="text-2xl font-bold text-gray-400">
                       {role === "buyer" ? "Buy Energy" : "Sell Energy"}
                     </h2>
                     <button
@@ -1300,7 +1302,7 @@ export default function VendingMachine() {
 
                   <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">
+                      <label className="block text-sm font-medium text-gray-500">
                         Amount (kWh)
                       </label>
                       <input
@@ -1320,7 +1322,7 @@ export default function VendingMachine() {
                     {role === "buyer" ? (
                       <>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700">
+                          <label className="block text-sm font-medium text-gray-500">
                             Bid Amount (ETH)
                           </label>
                           <input
@@ -1333,14 +1335,14 @@ export default function VendingMachine() {
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700">
+                          <label className="block text-sm font-medium text-gray-500">
                             Deposit Amount (ETH)
                           </label>
                           <input
                             type="number"
                             value={depositAmount}
                             onChange={(e) => setDepositAmount(e.target.value)}
-                            className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2"
+                            className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2 placeholder-gray-500 dark:placeholder-gray-300 bg-white dark:bg-gray-900 text-black dark:text-white"
                             placeholder="Enter deposit amount"
                             required
                           />
@@ -1374,7 +1376,7 @@ export default function VendingMachine() {
                     ) : (
                       <>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700">
+                          <label className="block text-sm font-medium text-gray-500">
                             Cost per kWh (ETH)
                           </label>
                           <input
@@ -1404,22 +1406,25 @@ export default function VendingMachine() {
           <WalletPage />
         )}
       </main>
-      <button
+      {/* <button
         onClick={(e) => {
           e.preventDefault();
           withdrawFunds;
         }}
       >
         withdraw funds
-      </button>
+      </button> */}
+      {/* <footer>
       <button
         onClick={(e) => {
           e.preventDefault();
           executeEnergyExchangeFromContract();
         }}
+        className="px-4 py-2 rounded-md bg-gray-300 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition"
       >
-        EXECUTE ENERGY exchange
+        EXECUTE ENERGY EXCHANGE
       </button>
+      </footer> */}
     </div>
   );
 }

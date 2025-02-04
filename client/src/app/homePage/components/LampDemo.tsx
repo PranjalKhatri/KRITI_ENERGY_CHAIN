@@ -22,7 +22,7 @@ export default function LampDemo() {
         <br />
         <div className=" absolute top-60 left-[26%]" >  
         <a
-        href="/platform"
+        href="/BarelyTokenized"
         className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-xl font-semibold text-lg transition-all transform hover:scale-105 hover:shadow-xl hover:shadow-green-500/20"
         >
             G e t &nbsp; S t a r t e d
