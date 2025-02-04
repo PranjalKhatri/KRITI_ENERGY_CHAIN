@@ -27,10 +27,16 @@ const CONTRACT_ABI = [
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "executeEnergyExchange",
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "sellEnergyToDSO",
 		"outputs": [],
-		"stateMutability": "nonpayable",
+		"stateMutability": "payable",
 		"type": "function"
 	},
 	{
@@ -81,16 +87,10 @@ const CONTRACT_ABI = [
 		"type": "event"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			}
-		],
-		"name": "sellEnergyToDSO",
+		"inputs": [],
+		"name": "executeEnergyExchange",
 		"outputs": [],
-		"stateMutability": "payable",
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -199,6 +199,25 @@ const CONTRACT_ABI = [
 			}
 		],
 		"name": "dsoFunctionCalls",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "energyBalance",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -401,7 +420,7 @@ const CONTRACT_ABI = [
 	}
 ];
 
-const CONTRACT_ADDRESS = "0x28EB375F5B75Ff5FFBF0774719CFb2dF1eFFD864";
+const CONTRACT_ADDRESS = "0x0D5943C5B0921FE06d3996e4B70346b9798eEed4";
 
 // Initialize Web3 and contract
 const initializeContract = () => {

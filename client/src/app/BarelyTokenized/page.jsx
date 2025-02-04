@@ -1,5 +1,6 @@
 "use client";
 
+//#region {IMPORTS}
 import { useState, useEffect } from "react";
 import Web3, { BlockTags } from "web3";
 import {
@@ -20,11 +21,15 @@ import vmContract from "../../../blockchain/firstcontract";
 import closebid from "../../../blockchain/closebid";
 import executeEnergy from "../../../blockchain/executeEnergy";
 import buyersBalance from "../../../blockchain/buyersBalance";
+import energyReserve from "../../../blockchain/energyReserve";
 import { initialize } from "zokrates-js";
 import axios from "axios";
 import { loadProvingKey, loadArtifacts } from "./artifactLoader";
+//#endregion
 
 export default function VendingMachine() {
+ 
+  //#region {STATES}
   const [error, setError] = useState("");
   const [errorProgress, setErrorProgress] = useState(100);
   const [inventory, setInventory] = useState("");
@@ -49,8 +54,11 @@ export default function VendingMachine() {
   const [tradingMode, setTradingMode] = useState("p2p"); // "p2p" or "dso"
   const [contractBalance, setContractBalance] = useState(0);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
-  const [currentEnergy, setCurrentEnergy] = useState(20);
+  const [currentEnergy, setCurrentEnergy] = useState(100);
 
+  //#endregion
+
+  //#region {USE EFFECTS}
   useEffect(() => {
     getInventoryHandler();
     if (account && web3) {
@@ -87,19 +95,75 @@ export default function VendingMachine() {
 
     const fetchBalance = async () => {
       updateWalletBalance();
+      await getEnergyBalanceFromContract();
       getContractBalance();
-      console.log("Updated Balance:", walletBalance);
+      // console.log("updated energy");
+      // console.log("Updated Balance:", walletBalance);
       // const consumerBalance = await getContractBalance();
       // console.log("Updated Balance:", consumerBalance);
     };
 
     fetchBalance(); // Run immediately
 
-    const interval = setInterval(fetchBalance, 10000); // Run every 10 seconds
+    const interval = setInterval(fetchBalance, 5000); // Run every k seconds
 
     return () => clearInterval(interval); // Cleanup on unmount or account change
   }, [account]);
+  
+  //#endregion
 
+
+  const setEnergyBalanceServer = async (amnt) => {
+    console.log("Updating energy balance in server:", amnt);
+
+    if (!account) {
+      console.log("Account is undefined. Cannot update energy.");
+      return false;
+    }
+
+    let parsedAmount = Number(amnt);
+    if (parsedAmount == 0) parsedAmount = 100;
+    if (isNaN(parsedAmount)) {
+      console.log("Invalid energy amount:", amnt);
+      return false;
+    }
+
+    try {
+      const response = await axios.put(
+        `http://localhost:8000/api/v1/users/${account}/energy`, // API endpoint
+        { energy: parsedAmount }, // Send parsed number
+        { headers: { "Content-Type": "application/json" } } // Headers
+      );
+
+      console.log("Energy Updated Successfully:", response.data);
+      return response.data;
+    } catch (error) {
+      console.log(
+        "Error updating energy in Server:",
+        error.response?.data || error.message
+      );
+      return false;
+    }
+  };
+
+  const getEnergyBalanceFromContract = async () => {
+    try {
+      const energyBalance = await executeEnergy.methods
+        .energyBalance(account)
+        .call();
+      console.log("Energy Balance:", energyBalance);
+      if (parseInt(energyBalance) !== 0) {
+        setCurrentEnergy(energyBalance);
+        setEnergyBalanceServer(energyBalance);
+      }
+      return energyBalance;
+    } catch (err) {
+      console.log("Error fetching energy balance:", err);
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  //#region {ZK-VERIFIERS}
   const ZokratesVerifier = async (balance, totalBidCost) => {
     initialize().then(async (zokratesProvider) => {
       const source =
@@ -138,7 +202,7 @@ export default function VendingMachine() {
         await tx.wait();
         console.log("Proof verified successfully");
       } catch (error) {
-        console.error("Error verifying proof:", error);
+        console.log("Error verifying proof:", error);
         setError(error instanceof Error ? error.message : String(error));
       }
       // or verify off-chain
@@ -155,7 +219,7 @@ export default function VendingMachine() {
       const provingKey = await loadProvingKey("buyersbalance/proving.key");
 
       if (!artifacts || !provingKey) {
-        console.error("Failed to load artifacts or proving key.");
+        console.log("Failed to load artifacts or proving key.");
         return false; // Return false if artifacts or proving key are not found
       }
 
@@ -212,35 +276,38 @@ export default function VendingMachine() {
       console.log("Proof verification result:", result);
       return result; // Return the result of the proof verification (true/false)
     } catch (error) {
-      console.error("Error verifying proof:", error);
+      console.log("Error verifying proof:", error);
       return false; // If there's an error, return false
     }
   };
-
-  const energyReserveVerifier = async (balance, totalBidCost) => {
+  const energyReserveVerifier = async (sellerReserve, sellingAmount) => {
     try {
       // Initialize ZoKrates provider
       const zokratesProvider = await initialize();
 
-      const artifacts = await loadArtifacts("buyersbalance/Buyersbalance_out");
-      const provingKey = await loadProvingKey("buyersbalance/proving.key");
+      const artifacts = await loadArtifacts("energyReserve/energyreserve_out");
+      const provingKey = await loadProvingKey(
+        "energyReserve/energyreserve_proving.key"
+      );
 
       if (!artifacts || !provingKey) {
-        console.error("Failed to load artifacts or proving key.");
+        console.log("Failed to load artifacts or proving key.");
         return false; // Return false if artifacts or proving key are not found
       }
 
       console.log("Artifacts:", artifacts);
       console.log("Proving Key:", provingKey);
-
+      console.log("params", "" + sellerReserve, "" + sellingAmount);
       // Compute witness
       const { witness, output } = await zokratesProvider.computeWitness(
         artifacts,
-        [balance, totalBidCost]
+        [sellerReserve, sellingAmount]
       );
       console.log("Witness:", witness);
       console.log("Output:", output);
-
+      console.log("output int ", typeof output);
+      // console.log("ouptut at pos ",output[0],"1",output[1],"2",output[2],"3",output[3],"4",output[4],"5",output[5]);
+      if (output[5] === "0") return false; // Ensures valid comparison
       // Generate proof using the proving key
       const proof = await zokratesProvider.generateProof(
         artifacts.program,
@@ -250,50 +317,30 @@ export default function VendingMachine() {
       console.log("Generated Proof:", proof);
 
       // Get the buyersBalance contract instance (Make sure this contract is already imported)
-      const buyersBalanceContract = buyersBalance; // Assuming buyersBalance is already imported
-
-      // Estimate gas for verifying the proof
-      const gasPrice = await web3.eth.getGasPrice();
-      console.log("Current gas price:", gasPrice);
-
-      const balance_ = await web3.eth.getBalance(account);
-      console.log(
-        "Account balance:",
-        web3.utils.fromWei(balance_, "ether"),
-        "ETH"
-      );
-
-      // Estimate gas for the transaction
-      const gasEstimate = await buyersBalanceContract.methods
-        .verifyTx(proof.proof, proof.inputs)
-        .estimateGas({ from: account });
-
-      console.log("Estimated gas:", gasEstimate);
-
-      // Add buffer to gas estimate
-      const gasLimit = Math.ceil(Number(gasEstimate) * 1.2); // 20% buffer
-      const totalCost = BigInt(gasPrice) * BigInt(gasLimit);
-      console.log("Total gas cost in wei:", totalCost.toString());
-
+      const energyReserveVerifierContract = energyReserve; // Assuming buyersBalance is already imported
       // Verify proof transaction
-      const result = await buyersBalanceContract.methods
+      const result = await energyReserveVerifierContract.methods
         .verifyTx(proof.proof, proof.inputs)
         .call({ from: account });
 
-      console.log("Proof verification result:", result);
+      console.log("Proof verification result Seller:", result);
       return result; // Return the result of the proof verification (true/false)
     } catch (error) {
-      console.error("Error verifying proof:", error);
+      console.log("Error verifying proof:", error);
       return false; // If there's an error, return false
     }
   };
+
+  //#endregion
+  
+  //#region {WALLET-FUNCTIONS}
 
   const updateWalletBalance = async () => {
     try {
       const balance = await web3.eth.getBalance(account);
       setWalletBalance(web3.utils.fromWei(balance, "ether"));
     } catch (err) {
-      console.error("Error fetching balance:", err);
+      console.log("Error fetching balance:", err);
       setError(err instanceof Error ? err.message : String(err));
     }
   };
@@ -309,8 +356,13 @@ export default function VendingMachine() {
       });
     } catch (err) {
       console.log("Error in user (duplication probably)");
-      console.error(err);
+      console.log(err);
     }
+    const resp = await axios.get(
+      `http://localhost:8000/api/v1/users/${userId}`
+    );
+    setCurrentEnergy(resp.data.energy);
+    console.log(resp);
     try {
       // 🔹 Fetch transactions for the user
       const response = await axios.get(
@@ -319,7 +371,7 @@ export default function VendingMachine() {
       console.log(response.data);
       setTransactions(response.data); // Store transactions in state
     } catch (error) {
-      console.error("Error fetching transactions:", error);
+      console.log("Error fetching transactions:", error);
       setError(error.response?.data?.message || "Could not fetch transactions");
     }
   };
@@ -351,7 +403,7 @@ export default function VendingMachine() {
       fetchUserTransactions(account); // Fetch updated transactions
       return response.data; // Return the created transaction
     } catch (error) {
-      console.error("Error creating transaction:", error);
+      console.log("Error creating transaction:", error);
       throw new Error(
         error.response?.data?.message || "Transaction creation failed"
       );
@@ -364,7 +416,7 @@ export default function VendingMachine() {
       // setInventory(inventory);
       // console.log("Inventory:", inventory);
     } catch (err) {
-      console.error(err.message);
+      console.log(err.message);
       setError(err instanceof Error ? err.message : String(err));
     }
   };
@@ -389,7 +441,7 @@ export default function VendingMachine() {
       console.log("User balance in mapping:", userBalanceInMapping);
       return web3.utils.fromWei(userBalanceInMapping, "ether"); // Convert from Wei to ETH
     } catch (err) {
-      console.error("Error fetching contract balance:", err);
+      console.log("Error fetching contract balance:", err);
       setError(err instanceof Error ? err.message : String(err));
     }
   };
@@ -415,7 +467,7 @@ export default function VendingMachine() {
             console.log("Switched to Ganache network.");
             setError(null);
           } catch (switchError) {
-            console.error("Error switching network:", switchError);
+            console.log("Error switching network:", switchError);
             setError("Please switch to Ganache manually.");
           }
           //   return;
@@ -428,7 +480,7 @@ export default function VendingMachine() {
         console.log("Account connected: ", account);
         fetchUserTransactions(account);
       } catch (err) {
-        console.error("Error connecting to wallet:", err);
+        console.log("Error connecting to wallet:", err);
         setError(err instanceof Error ? err.message : String(err));
       }
     } else {
@@ -465,7 +517,7 @@ export default function VendingMachine() {
       await updateWalletBalance();
       setTransactionAmount("");
     } catch (err) {
-      console.error("Transaction error:", err);
+      console.log("Transaction error:", err);
       setError(err instanceof Error ? err.message : String(err));
     }
   };
@@ -502,12 +554,15 @@ export default function VendingMachine() {
       updateWalletBalance();
       return txReceipt;
     } catch (err) {
-      console.error("Withdrawal error:", err);
+      console.log("Withdrawal error:", err);
       setError(err.message);
       setIsWithdrawing(false);
       throw err;
     }
   };
+  //#endregion
+  
+  //#region {BID-FUNCTIONS}
 
   async function depositFunds(amountInWei) {
     console.log(depositAmount);
@@ -537,7 +592,7 @@ export default function VendingMachine() {
 
       return result;
     } catch (error) {
-      console.error("Error depositing funds:", error);
+      console.log("Error depositing funds:", error);
       throw error;
     }
   }
@@ -572,6 +627,12 @@ export default function VendingMachine() {
         proofValid = await buyersBalanceVerifier(
           walletBalanceWei,
           totalBidCostWei
+        );
+      } else {
+        console.log("starting proof verification for seller using ZK");
+        proofValid = await energyReserveVerifier(
+          currentEnergy.toString(),
+          amount.toString()
         );
       }
       // const proofValid = true;
@@ -620,7 +681,7 @@ export default function VendingMachine() {
         return;
       }
     } catch (err) {
-      console.error("Error placing bid:", err);
+      console.log("Error placing bid:", err);
       setError(err instanceof Error ? err.message : String(err));
     }
   }
@@ -635,7 +696,7 @@ export default function VendingMachine() {
       }
       await getInventoryHandler();
     } catch (err) {
-      console.error(err.message);
+      console.log(err.message);
       setError(err instanceof Error ? err.message : String(err));
     }
   };
@@ -801,7 +862,9 @@ export default function VendingMachine() {
           <div className="space-y-2">
             <div className="flex justify-between text-sm text-gray-600">
               <span>Current Level</span>
-              <span className={`font-medium`}>{currentEnergy}%</span>
+              <span className={`font-medium`}>
+                {currentEnergy} <b>KWh</b>
+              </span>
             </div>
             <div className="w-full h-4 bg-gray-200 rounded-full overflow-hidden">
               <div
@@ -874,7 +937,9 @@ export default function VendingMachine() {
       </div>
     );
   };
+  //#endregion
 
+  //#region {DSO-FUNCTIONS}
   const buyFromDSO = async (energyAmount) => {
     if (!web3 || !account) {
       setError("Web3 or account not initialized. Please connect your wallet.");
@@ -897,7 +962,7 @@ export default function VendingMachine() {
         to: executeEnergy.options.address,
         data: executeEnergy.methods.buyEnergyFromDSO(energyAmount).encodeABI(),
         gas: gasEstimate, // Use the estimated gas
-        value: web3.utils.toWei(energyAmount.toString(), "ether"), // Convert energyAmount to Wei if needed
+        value: energyAmount + "", // Convert energyAmount to Wei if needed
       };
 
       // Send the transaction
@@ -906,7 +971,7 @@ export default function VendingMachine() {
 
       return result;
     } catch (err) {
-      console.error("Error buying energy:", err);
+      console.log("Error buying energy:", err);
       setError(err instanceof Error ? err.message : String(err));
     }
   };
@@ -935,10 +1000,12 @@ export default function VendingMachine() {
 
       return result;
     } catch (err) {
-      console.error("Error Selling energy:", err);
+      console.log("Error Selling energy:", err);
       setError(err instanceof Error ? err.message : String(err));
     }
   };
+  //#endregion
+  
   const executeEnergyExchangeFromContract = async () => {
     try {
       // Log relevant contract state before execution
@@ -973,33 +1040,35 @@ export default function VendingMachine() {
       console.log("Transaction Hash:", transaction.transactionHash);
       return transaction;
     } catch (error) {
-      console.error("Full error details:", error);
+      console.log("Full error details:", error);
       throw error;
     }
   };
   // Get past events
-/*   async function listenForEnergyExchange(callback) {
+  /*   async function listenForEnergyExchange(callback) {
     console.log("Listening for EnergyExchanged event...");
     
     console.log(await executeEnergy.getPastEvents("EnergyExchanged"));
 }
  */
-// listenForEnergyExchange((data) => {
-//     console.log("Event Detected:", data);
-// });
-// setInterval(() => {
-//   listenForEnergyExchange();
-// }, 5000);
+  // listenForEnergyExchange((data) => {
+  //     console.log("Event Detected:", data);
+  // });
+  // setInterval(() => {
+  //   listenForEnergyExchange();
+  // }, 5000);
+
+  //#region {PAGE}
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-teal-50 to-green-100">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800">
       {/* Header */}
-      <header className="bg-white shadow-sm">
+      <header className="bg-gray-800 border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-2">
-              <ArrowRightLeft className="h-6 w-6 text-teal-600" />
-              <h1 className="text-xl font-bold text-gray-900">
+              <ArrowRightLeft className="h-6 w-6 text-emerald-400" />
+              <h1 className="text-xl font-bold text-white">
                 Energy Trading Platform
               </h1>
             </div>
@@ -1009,8 +1078,8 @@ export default function VendingMachine() {
                   onClick={() => setCurrentPage("trading")}
                   className={`px-3 py-2 rounded-md text-sm font-medium ${
                     currentPage === "trading"
-                      ? "bg-gray-100 text-gray-900"
-                      : "text-gray-600 hover:text-gray-900"
+                      ? "bg-gray-700 text-white"
+                      : "text-gray-300 hover:text-white"
                   }`}
                 >
                   Trading
@@ -1019,8 +1088,8 @@ export default function VendingMachine() {
                   onClick={() => setCurrentPage("wallet")}
                   className={`px-3 py-2 rounded-md text-sm font-medium ${
                     currentPage === "wallet"
-                      ? "bg-gray-100 text-gray-900"
-                      : "text-gray-600 hover:text-gray-900"
+                      ? "bg-gray-700 text-white-900"
+                      : "text-gray-300 hover:text-white-900"
                   }`}
                 >
                   Wallet
@@ -1030,8 +1099,8 @@ export default function VendingMachine() {
                 onClick={connectWalletHandler}
                 className={`flex items-center space-x-2 px-4 py-2 rounded-lg ${
                   account
-                    ? "bg-teal-100 text-teal-700"
-                    : "bg-teal-600 text-white hover:bg-teal-700"
+                    ? "bg-emerald-900 text-emerald-200"
+                    : "bg-emerald-600 text-white hover:bg-emerald-700"
                 }`}
               >
                 <Wallet className="h-5 w-5" />
@@ -1078,13 +1147,13 @@ export default function VendingMachine() {
             {/* Trading Mode Selection */}
             {!role && (
               <div className="mb-8">
-                <div className="flex justify-center space-x-4 p-4 bg-white rounded-lg shadow-sm">
+                <div className="flex justify-center space-x-4 p-4 bg-gray-800 border-gray-700 rounded-lg shadow-sm">
                   <button
                     onClick={() => setTradingMode("p2p")}
                     className={`px-6 py-3 rounded-lg flex items-center space-x-2 ${
                       tradingMode === "p2p"
-                        ? "bg-teal-100 text-teal-800"
-                        : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+                        ? "bg-emerald-100 text-emerald-800"
+                        : "bg-gray-700 text-gray-600 hover:bg-gray-600"
                     }`}
                   >
                     <ArrowLeftRight className="h-5 w-5" />
@@ -1094,8 +1163,8 @@ export default function VendingMachine() {
                     onClick={() => setTradingMode("dso")}
                     className={`px-6 py-3 rounded-lg flex items-center space-x-2 ${
                       tradingMode === "dso"
-                        ? "bg-teal-100 text-teal-800"
-                        : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+                        ? "bg-emerald-100 text-emerald-800"
+                        : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                     }`}
                   >
                     <Building2 className="h-5 w-5" />
@@ -1110,21 +1179,21 @@ export default function VendingMachine() {
                 <button
                   onClick={() => setRole("buyer")}
                   disabled={!account}
-                  className={`flex flex-col items-center p-8 bg-white rounded-xl shadow-lg transition-all ${
+                  className={`flex flex-col items-center p-8 bg-gray rounded-xl shadow-lg transition-all ${
                     account
-                      ? "hover:shadow-xl cursor-pointer"
+                      ? "hover:bg-gray-700 cursor-pointer"
                       : "opacity-50 cursor-not-allowed"
                   }`}
                 >
-                  <Battery className="h-16 w-16 text-teal-600 mb-4" />
-                  <h2 className="text-2xl font-bold text-gray-900">
+                  <Battery className="h-16 w-16 text-emerald-600 mb-4" />
+                  <h2 className="text-2xl font-bold text-white-900">
                     Buy Energy
                   </h2>
                   <p className="mt-2 text-gray-600">
                     Purchase energy from sellers
                   </p>
                   {!account && (
-                    <p className="mt-2 text-sm text-red-500">
+                    <p className="mt-2 text-sm text-red-400">
                       Connect wallet to continue
                     </p>
                   )}
@@ -1133,14 +1202,14 @@ export default function VendingMachine() {
                 <button
                   onClick={() => setRole("seller")}
                   disabled={!account}
-                  className={`flex flex-col items-center p-8 bg-white rounded-xl shadow-lg transition-all ${
+                  className={`flex flex-col items-center p-8 bg-gray-800 rounded-xl shadow-lg transition-all ${
                     account
-                      ? "hover:shadow-xl cursor-pointer"
+                      ? "hover:bg-gray cursor-pointer"
                       : "opacity-50 cursor-not-allowed"
                   }`}
                 >
-                  <BatteryCharging className="h-16 w-16 text-teal-600 mb-4" />
-                  <h2 className="text-2xl font-bold text-gray-900">
+                  <BatteryCharging className="h-16 w-16 text-emerald-600 mb-4" />
+                  <h2 className="text-2xl font-bold text-white-900">
                     Sell Energy
                   </h2>
                   <p className="mt-2 text-gray-600">Sell your excess energy</p>
@@ -1155,14 +1224,14 @@ export default function VendingMachine() {
             {/* DSO Trading Interface */}
             {!role && tradingMode === "dso" && (
               <div className="grid md:grid-cols-2 gap-8 mt-8">
-                <div className="bg-white rounded-xl shadow-lg p-8">
+                <div className="bg-gray-800 rounded-xl shadow-lg p-8">
                   <div className="text-center mb-6">
-                    <Building2 className="h-16 w-16 text-teal-600 mx-auto mb-4" />
+                    <Building2 className="h-16 w-16 text-emerald-600 mx-auto mb-4" />
                     <h2 className="text-2xl font-bold text-gray-900">
                       Buy from DSO
                     </h2>
                     <p className="mt-2 text-gray-600">
-                      Current DSO Rate: 0.15 ETH/kWh
+                      Current DSO Rate: 8 ETH/kWh
                     </p>
                   </div>
                   <form
@@ -1180,7 +1249,7 @@ export default function VendingMachine() {
                         type="number"
                         value={buyAmount}
                         onChange={(e) => setBuyAmount(e.target.value)}
-                        className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2"
+                        className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 bg-white dark:bg-gray-900"
                         placeholder="Enter amount to buy"
                         required
                       />
@@ -1195,14 +1264,14 @@ export default function VendingMachine() {
                   </form>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-lg p-8">
+                <div className="bg-gray rounded-xl shadow-lg p-8">
                   <div className="text-center mb-6">
                     <Building2 className="h-16 w-16 text-teal-600 mx-auto mb-4" />
                     <h2 className="text-2xl font-bold text-gray-900">
                       Sell to DSO
                     </h2>
                     <p className="mt-2 text-gray-600">
-                      Current DSO Buy Rate: 0.12 ETH/kWh
+                      Current DSO Buy Rate: 2 ETH/kWh
                     </p>
                   </div>
                   <form
@@ -1220,7 +1289,7 @@ export default function VendingMachine() {
                         type="number"
                         value={sellAmount}
                         onChange={(e) => setSellAmount(e.target.value)}
-                        className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2"
+                        className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 bg-white dark:bg-gray-900"
                         placeholder="Enter amount to sell"
                         required
                       />
@@ -1242,9 +1311,9 @@ export default function VendingMachine() {
               <div className="max-w-2xl mx-auto">
                 {account && lastBid && <BidHistory />}
 
-                <div className="bg-white rounded-xl shadow-lg p-6">
+                <div className="bg-gray rounded-xl shadow-lg p-6">
                   <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-2xl font-bold text-gray-900">
+                    <h2 className="text-2xl font-bold text-gray-400">
                       {role === "buyer" ? "Buy Energy" : "Sell Energy"}
                     </h2>
                     <button
@@ -1257,7 +1326,7 @@ export default function VendingMachine() {
 
                   <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">
+                      <label className="block text-sm font-medium text-gray-500">
                         Amount (kWh)
                       </label>
                       <input
@@ -1277,7 +1346,7 @@ export default function VendingMachine() {
                     {role === "buyer" ? (
                       <>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700">
+                          <label className="block text-sm font-medium text-gray-500">
                             Bid Amount (ETH)
                           </label>
                           <input
@@ -1290,14 +1359,14 @@ export default function VendingMachine() {
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700">
+                          <label className="block text-sm font-medium text-gray-500">
                             Deposit Amount (ETH)
                           </label>
                           <input
                             type="number"
                             value={depositAmount}
                             onChange={(e) => setDepositAmount(e.target.value)}
-                            className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2"
+                            className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 p-2 placeholder-gray-500 dark:placeholder-gray-300 bg-white dark:bg-gray-900 text-black dark:text-white"
                             placeholder="Enter deposit amount"
                             required
                           />
@@ -1331,7 +1400,7 @@ export default function VendingMachine() {
                     ) : (
                       <>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700">
+                          <label className="block text-sm font-medium text-gray-500">
                             Cost per kWh (ETH)
                           </label>
                           <input
@@ -1361,22 +1430,27 @@ export default function VendingMachine() {
           <WalletPage />
         )}
       </main>
-      <button
+      {/* <button
         onClick={(e) => {
           e.preventDefault();
           withdrawFunds;
         }}
       >
         withdraw funds
-      </button>
+      </button> */}
+      {<footer>
       <button
         onClick={(e) => {
           e.preventDefault();
           executeEnergyExchangeFromContract();
         }}
+        className="px-4 py-2 rounded-md bg-gray-300 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition"
       >
-        EXECUTE ENERGY exchange
+        EXECUTE ENERGY EXCHANGE
       </button>
+      </footer>}
     </div>
   );
+
+  //#endregion
 }

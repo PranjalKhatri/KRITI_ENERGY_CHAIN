@@ -1,0 +1,12 @@
+def main(private field energyReserve, field sellAmount) -> field{
+
+      field res = energyReserve >= sellAmount ? 1 : 0 ;
+
+     return res;
+
+}
+   
+
+
+
+
