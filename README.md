@@ -48,7 +48,7 @@ Now, the users get the option to buy or sell their amount from DSO(Distribution 
 The price at which DSO buys energy is less than the minimum of the seller's price array and the price at which DSO sells energy would be greater than the maximum of the buyer's price array.
 
 ### IoT and Smart Meter Integration
-Smart Meter sends meter readings to the server at a fixed time interval using NodeMCU. The system features an alerting system, a home automation unit, a forecasting system and an android application. The data collection unit comprises the power sensor which is used to measure consumption and a module comprising IR Sensors which we use for the home automation system. Firstly, user's consumption acquired by the power sensor is sent to the NodeMCU. The NodeMCU is used to send the data to the cloud. 
+Smart Meter sends meter readings to the server at a fixed time interval using NodeMCU. The system features an alerting system, a home automation unit, a forecasting system and an android application. The data collection unit comprises the power sensor which is used to measure consumption and a module comprising IR Sensors which we use for the home automation system. Firstly, user's consumption acquired by the power sensor is sent to the **NodeMCU**. The NodeMCU is used to send the data to the cloud. 
 
 
 ![Project Logo](IoT_Architecture.jpg)
@@ -69,8 +69,11 @@ IoT sensors on solar panels can monitor sunlight exposure, temperature, and powe
 By analyzing sensor data over time, algorithms can predict the availability and consistency of an energy source, helping distinguish between renewable (fluctuating but replenished) and non-renewable (finite) sources. If the energy source shows consistent fluctuations based on natural cycles (like sunlight or wind), it is likely renewable. This helps to seperate the producers into renewable and non-renewable.  
 
 ### ZK-SNARKS Integration
-We have used multiple functions such as BuyersBalance.zok, EnergyReserve.zok, CCTVverify.zok to verify whether buyer has enough money to make the transaction, seller has enough energy to tranfer(IoT),
+We have used multiple functions such as **BuyersBalance.zok, EnergyReserve.zok, CCTVverify.zok** to verify whether buyer has enough money to make the transaction, seller has enough energy to tranfer(IoT),
 smooth trade and availbility of Carbon Credits without exposing the data to other users enhancing the privacy and security of the transactions. 
+
+### Carbon Credit Trading
+First we calculate the **Seller's Efficiency Score** based on **Renewable Energy Ratio, Equipment Efficiency and Grid Loss Factor** which allows us to calculate how renewable any seller is. This allows us to give carbon credits on the basis of this Efficiency Score
 
 ## System Components
 1. **Blockchain Layer**
