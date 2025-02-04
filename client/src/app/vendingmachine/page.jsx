@@ -50,7 +50,7 @@ export default function VendingMachine() {
   const [tradingMode, setTradingMode] = useState("p2p"); // "p2p" or "dso"
   const [contractBalance, setContractBalance] = useState(0);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
-  const [currentEnergy, setCurrentEnergy] = useState(20);
+  const [currentEnergy, setCurrentEnergy] = useState(100);
 
   useEffect(() => {
     getInventoryHandler();
@@ -88,15 +88,17 @@ export default function VendingMachine() {
 
     const fetchBalance = async () => {
       updateWalletBalance();
+      await getEnergyBalanceFromContract();
       getContractBalance();
-      console.log("Updated Balance:", walletBalance);
+      // console.log("updated energy");
+      // console.log("Updated Balance:", walletBalance);
       // const consumerBalance = await getContractBalance();
       // console.log("Updated Balance:", consumerBalance);
     };
 
     fetchBalance(); // Run immediately
 
-    const interval = setInterval(fetchBalance, 10000); // Run every 10 seconds
+    const interval = setInterval(fetchBalance, 5000); // Run every k seconds
 
     return () => clearInterval(interval); // Cleanup on unmount or account change
   }, [account]);
@@ -145,6 +147,54 @@ export default function VendingMachine() {
       // or verify off-chain
       // const isVerified = zokratesProvider.verify(keypair.vk, proof);
     });
+  };
+  
+  const setEnergyBalanceServer = async (amnt) => {
+    console.log("Updating energy balance in server:", amnt);
+
+    if (!account) {
+        console.error("Account is undefined. Cannot update energy.");
+        return false;
+    }
+
+    let parsedAmount = Number(amnt);
+    if(parsedAmount == 0)parsedAmount=100;
+    if (isNaN(parsedAmount)) {
+        console.error("Invalid energy amount:", amnt);
+        return false;
+    }
+
+    try {
+        const response = await axios.put(
+            `http://localhost:8000/api/v1/users/${account}/energy`, // API endpoint
+            { energy: parsedAmount }, // Send parsed number
+            { headers: { "Content-Type": "application/json" } } // Headers
+        );
+
+        console.log("Energy Updated Successfully:", response.data);
+        return response.data;
+    } catch (error) {
+        console.error("Error updating energy in Server:", error.response?.data || error.message);
+        return false;
+    }
+};
+
+
+  const getEnergyBalanceFromContract = async () => {
+    try {
+      const energyBalance = await executeEnergy.methods
+        .energyBalance(account)
+        .call();
+      console.log("Energy Balance:", energyBalance);
+      if(parseInt(energyBalance) !== 0) {
+        setCurrentEnergy(energyBalance);
+        setEnergyBalanceServer(energyBalance);
+      }
+      return energyBalance;
+    } catch (err) {
+      console.error("Error fetching energy balance:", err);
+      setError(err instanceof Error ? err.message : String(err));
+    }
   };
 
   const buyersBalanceVerifier = async (balance, totalBidCost) => {
@@ -223,7 +273,9 @@ export default function VendingMachine() {
       const zokratesProvider = await initialize();
 
       const artifacts = await loadArtifacts("energyReserve/energyreserve_out");
-      const provingKey = await loadProvingKey("energyReserve/energyreserve_proving.key");
+      const provingKey = await loadProvingKey(
+        "energyReserve/energyreserve_proving.key"
+      );
 
       if (!artifacts || !provingKey) {
         console.error("Failed to load artifacts or proving key.");
@@ -232,7 +284,7 @@ export default function VendingMachine() {
 
       console.log("Artifacts:", artifacts);
       console.log("Proving Key:", provingKey);
-      console.log("params",""+sellerReserve, ""+sellingAmount);
+      console.log("params", "" + sellerReserve, "" + sellingAmount);
       // Compute witness
       const { witness, output } = await zokratesProvider.computeWitness(
         artifacts,
@@ -240,7 +292,7 @@ export default function VendingMachine() {
       );
       console.log("Witness:", witness);
       console.log("Output:", output);
-      console.log("output int ",typeof output);
+      console.log("output int ", typeof output);
       // console.log("ouptut at pos ",output[0],"1",output[1],"2",output[2],"3",output[3],"4",output[4],"5",output[5]);
       if (output[5] === "0") return false; // Ensures valid comparison
       // Generate proof using the proving key
@@ -289,7 +341,9 @@ export default function VendingMachine() {
       console.log("Error in user (duplication probably)");
       console.error(err);
     }
-    const resp = await axios.get(`http://localhost:8000/api/v1/users/${userId}`);
+    const resp = await axios.get(
+      `http://localhost:8000/api/v1/users/${userId}`
+    );
     setCurrentEnergy(resp.data.energy);
     console.log(resp);
     try {
@@ -549,15 +603,18 @@ export default function VendingMachine() {
       console.log(walletBalanceWei, totalBidCostWei);
       // Verify the buyer's balance
       let proofValid = true;
-      if (isProducer == 0) {
+      /*if (isProducer == 0) {
         proofValid = await buyersBalanceVerifier(
           walletBalanceWei,
           totalBidCostWei
         );
-      }else{
+      } else {
         console.log("starting proof verification for seller using ZK");
-        proofValid = await energyReserveVerifier(currentEnergy.toString(),amount.toString());
-      }
+        proofValid = await energyReserveVerifier(
+          currentEnergy.toString(),
+          amount.toString()
+        );
+      }*/
       // const proofValid = true;
       if (proofValid) {
         console.log("Proof verified successfully!");
@@ -785,7 +842,9 @@ export default function VendingMachine() {
           <div className="space-y-2">
             <div className="flex justify-between text-sm text-gray-600">
               <span>Current Level</span>
-              <span className={`font-medium`}>{currentEnergy}%</span>
+              <span className={`font-medium`}>
+                {currentEnergy} <b>KWh</b>
+              </span>
             </div>
             <div className="w-full h-4 bg-gray-200 rounded-full overflow-hidden">
               <div
@@ -962,18 +1021,18 @@ export default function VendingMachine() {
     }
   };
   // Get past events
-/*   async function listenForEnergyExchange(callback) {
+  /*   async function listenForEnergyExchange(callback) {
     console.log("Listening for EnergyExchanged event...");
     
     console.log(await executeEnergy.getPastEvents("EnergyExchanged"));
 }
  */
-// listenForEnergyExchange((data) => {
-//     console.log("Event Detected:", data);
-// });
-// setInterval(() => {
-//   listenForEnergyExchange();
-// }, 5000);
+  // listenForEnergyExchange((data) => {
+  //     console.log("Event Detected:", data);
+  // });
+  // setInterval(() => {
+  //   listenForEnergyExchange();
+  // }, 5000);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 to-green-100">
