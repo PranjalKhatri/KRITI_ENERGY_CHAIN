@@ -1,5 +1,6 @@
 "use client";
 
+//#region {IMPORTS}
 import { useState, useEffect } from "react";
 import Web3, { BlockTags } from "web3";
 import {
@@ -24,8 +25,11 @@ import energyReserve from "../../../blockchain/energyReserve";
 import { initialize } from "zokrates-js";
 import axios from "axios";
 import { loadProvingKey, loadArtifacts } from "./artifactLoader";
+//#endregion
 
 export default function VendingMachine() {
+ 
+  //#region {STATES}
   const [error, setError] = useState("");
   const [errorProgress, setErrorProgress] = useState(100);
   const [inventory, setInventory] = useState("");
@@ -52,6 +56,9 @@ export default function VendingMachine() {
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [currentEnergy, setCurrentEnergy] = useState(100);
 
+  //#endregion
+
+  //#region {USE EFFECTS}
   useEffect(() => {
     getInventoryHandler();
     if (account && web3) {
@@ -102,7 +109,61 @@ export default function VendingMachine() {
 
     return () => clearInterval(interval); // Cleanup on unmount or account change
   }, [account]);
+  
+  //#endregion
 
+
+  const setEnergyBalanceServer = async (amnt) => {
+    console.log("Updating energy balance in server:", amnt);
+
+    if (!account) {
+      console.log("Account is undefined. Cannot update energy.");
+      return false;
+    }
+
+    let parsedAmount = Number(amnt);
+    if (parsedAmount == 0) parsedAmount = 100;
+    if (isNaN(parsedAmount)) {
+      console.log("Invalid energy amount:", amnt);
+      return false;
+    }
+
+    try {
+      const response = await axios.put(
+        `http://localhost:8000/api/v1/users/${account}/energy`, // API endpoint
+        { energy: parsedAmount }, // Send parsed number
+        { headers: { "Content-Type": "application/json" } } // Headers
+      );
+
+      console.log("Energy Updated Successfully:", response.data);
+      return response.data;
+    } catch (error) {
+      console.log(
+        "Error updating energy in Server:",
+        error.response?.data || error.message
+      );
+      return false;
+    }
+  };
+
+  const getEnergyBalanceFromContract = async () => {
+    try {
+      const energyBalance = await executeEnergy.methods
+        .energyBalance(account)
+        .call();
+      console.log("Energy Balance:", energyBalance);
+      if (parseInt(energyBalance) !== 0) {
+        setCurrentEnergy(energyBalance);
+        setEnergyBalanceServer(energyBalance);
+      }
+      return energyBalance;
+    } catch (err) {
+      console.log("Error fetching energy balance:", err);
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  //#region {ZK-VERIFIERS}
   const ZokratesVerifier = async (balance, totalBidCost) => {
     initialize().then(async (zokratesProvider) => {
       const source =
@@ -141,62 +202,12 @@ export default function VendingMachine() {
         await tx.wait();
         console.log("Proof verified successfully");
       } catch (error) {
-        console.error("Error verifying proof:", error);
+        console.log("Error verifying proof:", error);
         setError(error instanceof Error ? error.message : String(error));
       }
       // or verify off-chain
       // const isVerified = zokratesProvider.verify(keypair.vk, proof);
     });
-  };
-
-  const setEnergyBalanceServer = async (amnt) => {
-    console.log("Updating energy balance in server:", amnt);
-
-    if (!account) {
-      console.error("Account is undefined. Cannot update energy.");
-      return false;
-    }
-
-    let parsedAmount = Number(amnt);
-    if (parsedAmount == 0) parsedAmount = 100;
-    if (isNaN(parsedAmount)) {
-      console.error("Invalid energy amount:", amnt);
-      return false;
-    }
-
-    try {
-      const response = await axios.put(
-        `http://localhost:8000/api/v1/users/${account}/energy`, // API endpoint
-        { energy: parsedAmount }, // Send parsed number
-        { headers: { "Content-Type": "application/json" } } // Headers
-      );
-
-      console.log("Energy Updated Successfully:", response.data);
-      return response.data;
-    } catch (error) {
-      console.error(
-        "Error updating energy in Server:",
-        error.response?.data || error.message
-      );
-      return false;
-    }
-  };
-
-  const getEnergyBalanceFromContract = async () => {
-    try {
-      const energyBalance = await executeEnergy.methods
-        .energyBalance(account)
-        .call();
-      console.log("Energy Balance:", energyBalance);
-      if (parseInt(energyBalance) !== 0) {
-        setCurrentEnergy(energyBalance);
-        setEnergyBalanceServer(energyBalance);
-      }
-      return energyBalance;
-    } catch (err) {
-      console.error("Error fetching energy balance:", err);
-      setError(err instanceof Error ? err.message : String(err));
-    }
   };
 
   const buyersBalanceVerifier = async (balance, totalBidCost) => {
@@ -208,7 +219,7 @@ export default function VendingMachine() {
       const provingKey = await loadProvingKey("buyersbalance/proving.key");
 
       if (!artifacts || !provingKey) {
-        console.error("Failed to load artifacts or proving key.");
+        console.log("Failed to load artifacts or proving key.");
         return false; // Return false if artifacts or proving key are not found
       }
 
@@ -265,7 +276,7 @@ export default function VendingMachine() {
       console.log("Proof verification result:", result);
       return result; // Return the result of the proof verification (true/false)
     } catch (error) {
-      console.error("Error verifying proof:", error);
+      console.log("Error verifying proof:", error);
       return false; // If there's an error, return false
     }
   };
@@ -280,7 +291,7 @@ export default function VendingMachine() {
       );
 
       if (!artifacts || !provingKey) {
-        console.error("Failed to load artifacts or proving key.");
+        console.log("Failed to load artifacts or proving key.");
         return false; // Return false if artifacts or proving key are not found
       }
 
@@ -315,17 +326,21 @@ export default function VendingMachine() {
       console.log("Proof verification result Seller:", result);
       return result; // Return the result of the proof verification (true/false)
     } catch (error) {
-      console.error("Error verifying proof:", error);
+      console.log("Error verifying proof:", error);
       return false; // If there's an error, return false
     }
   };
+
+  //#endregion
+  
+  //#region {WALLET-FUNCTIONS}
 
   const updateWalletBalance = async () => {
     try {
       const balance = await web3.eth.getBalance(account);
       setWalletBalance(web3.utils.fromWei(balance, "ether"));
     } catch (err) {
-      console.error("Error fetching balance:", err);
+      console.log("Error fetching balance:", err);
       setError(err instanceof Error ? err.message : String(err));
     }
   };
@@ -341,7 +356,7 @@ export default function VendingMachine() {
       });
     } catch (err) {
       console.log("Error in user (duplication probably)");
-      console.error(err);
+      console.log(err);
     }
     const resp = await axios.get(
       `http://localhost:8000/api/v1/users/${userId}`
@@ -356,7 +371,7 @@ export default function VendingMachine() {
       console.log(response.data);
       setTransactions(response.data); // Store transactions in state
     } catch (error) {
-      console.error("Error fetching transactions:", error);
+      console.log("Error fetching transactions:", error);
       setError(error.response?.data?.message || "Could not fetch transactions");
     }
   };
@@ -388,7 +403,7 @@ export default function VendingMachine() {
       fetchUserTransactions(account); // Fetch updated transactions
       return response.data; // Return the created transaction
     } catch (error) {
-      console.error("Error creating transaction:", error);
+      console.log("Error creating transaction:", error);
       throw new Error(
         error.response?.data?.message || "Transaction creation failed"
       );
@@ -401,7 +416,7 @@ export default function VendingMachine() {
       // setInventory(inventory);
       // console.log("Inventory:", inventory);
     } catch (err) {
-      console.error(err.message);
+      console.log(err.message);
       setError(err instanceof Error ? err.message : String(err));
     }
   };
@@ -426,7 +441,7 @@ export default function VendingMachine() {
       console.log("User balance in mapping:", userBalanceInMapping);
       return web3.utils.fromWei(userBalanceInMapping, "ether"); // Convert from Wei to ETH
     } catch (err) {
-      console.error("Error fetching contract balance:", err);
+      console.log("Error fetching contract balance:", err);
       setError(err instanceof Error ? err.message : String(err));
     }
   };
@@ -452,7 +467,7 @@ export default function VendingMachine() {
             console.log("Switched to Ganache network.");
             setError(null);
           } catch (switchError) {
-            console.error("Error switching network:", switchError);
+            console.log("Error switching network:", switchError);
             setError("Please switch to Ganache manually.");
           }
           //   return;
@@ -465,7 +480,7 @@ export default function VendingMachine() {
         console.log("Account connected: ", account);
         fetchUserTransactions(account);
       } catch (err) {
-        console.error("Error connecting to wallet:", err);
+        console.log("Error connecting to wallet:", err);
         setError(err instanceof Error ? err.message : String(err));
       }
     } else {
@@ -502,7 +517,7 @@ export default function VendingMachine() {
       await updateWalletBalance();
       setTransactionAmount("");
     } catch (err) {
-      console.error("Transaction error:", err);
+      console.log("Transaction error:", err);
       setError(err instanceof Error ? err.message : String(err));
     }
   };
@@ -539,12 +554,15 @@ export default function VendingMachine() {
       updateWalletBalance();
       return txReceipt;
     } catch (err) {
-      console.error("Withdrawal error:", err);
+      console.log("Withdrawal error:", err);
       setError(err.message);
       setIsWithdrawing(false);
       throw err;
     }
   };
+  //#endregion
+  
+  //#region {BID-FUNCTIONS}
 
   async function depositFunds(amountInWei) {
     console.log(depositAmount);
@@ -574,7 +592,7 @@ export default function VendingMachine() {
 
       return result;
     } catch (error) {
-      console.error("Error depositing funds:", error);
+      console.log("Error depositing funds:", error);
       throw error;
     }
   }
@@ -663,7 +681,7 @@ export default function VendingMachine() {
         return;
       }
     } catch (err) {
-      console.error("Error placing bid:", err);
+      console.log("Error placing bid:", err);
       setError(err instanceof Error ? err.message : String(err));
     }
   }
@@ -678,7 +696,7 @@ export default function VendingMachine() {
       }
       await getInventoryHandler();
     } catch (err) {
-      console.error(err.message);
+      console.log(err.message);
       setError(err instanceof Error ? err.message : String(err));
     }
   };
@@ -919,7 +937,9 @@ export default function VendingMachine() {
       </div>
     );
   };
+  //#endregion
 
+  //#region {DSO-FUNCTIONS}
   const buyFromDSO = async (energyAmount) => {
     if (!web3 || !account) {
       setError("Web3 or account not initialized. Please connect your wallet.");
@@ -951,7 +971,7 @@ export default function VendingMachine() {
 
       return result;
     } catch (err) {
-      console.error("Error buying energy:", err);
+      console.log("Error buying energy:", err);
       setError(err instanceof Error ? err.message : String(err));
     }
   };
@@ -980,10 +1000,12 @@ export default function VendingMachine() {
 
       return result;
     } catch (err) {
-      console.error("Error Selling energy:", err);
+      console.log("Error Selling energy:", err);
       setError(err instanceof Error ? err.message : String(err));
     }
   };
+  //#endregion
+  
   const executeEnergyExchangeFromContract = async () => {
     try {
       // Log relevant contract state before execution
@@ -1018,7 +1040,7 @@ export default function VendingMachine() {
       console.log("Transaction Hash:", transaction.transactionHash);
       return transaction;
     } catch (error) {
-      console.error("Full error details:", error);
+      console.log("Full error details:", error);
       throw error;
     }
   };
@@ -1035,6 +1057,8 @@ export default function VendingMachine() {
   // setInterval(() => {
   //   listenForEnergyExchange();
   // }, 5000);
+
+  //#region {PAGE}
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800">
@@ -1207,7 +1231,7 @@ export default function VendingMachine() {
                       Buy from DSO
                     </h2>
                     <p className="mt-2 text-gray-600">
-                      Current DSO Rate: 0.15 ETH/kWh
+                      Current DSO Rate: 8 ETH/kWh
                     </p>
                   </div>
                   <form
@@ -1247,7 +1271,7 @@ export default function VendingMachine() {
                       Sell to DSO
                     </h2>
                     <p className="mt-2 text-gray-600">
-                      Current DSO Buy Rate: 0.12 ETH/kWh
+                      Current DSO Buy Rate: 2 ETH/kWh
                     </p>
                   </div>
                   <form
@@ -1414,7 +1438,7 @@ export default function VendingMachine() {
       >
         withdraw funds
       </button> */}
-      {/* <footer>
+      {<footer>
       <button
         onClick={(e) => {
           e.preventDefault();
@@ -1424,7 +1448,9 @@ export default function VendingMachine() {
       >
         EXECUTE ENERGY EXCHANGE
       </button>
-      </footer> */}
+      </footer>}
     </div>
   );
+
+  //#endregion
 }
