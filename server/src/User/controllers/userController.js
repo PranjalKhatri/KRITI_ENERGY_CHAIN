@@ -33,3 +33,48 @@ export const getUsers = async (req, res) => {
     res.status(500).json({ message: "Server Error", error: error.message });
   }
 };
+
+export const getUserByAccountNumber = async (req, res) => {
+  try {
+    const { accountNumber } = req.params; // Extract accountNumber from request parameters
+
+    // Find user by accountNumber
+    const user = await User.findOne({ accountNumber });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json(user);
+  } catch (error) {
+    console.error("Error fetching user:", error);
+    res.status(500).json({ message: "Server Error", error: error.message });
+  }
+};
+export const updateUserEnergy = async (req, res) => {
+  try {
+    const { accountNumber } = req.params; // Extract accountNumber from request parameters
+    const { energy } = req.body; // Extract new energy value from request body
+
+    // Validate energy value
+    if (typeof energy !== "number" || energy < 0) {
+      return res.status(400).json({ message: "Energy must be a positive number" });
+    }
+
+    // Find and update the user
+    const user = await User.findOneAndUpdate(
+      { accountNumber },
+      { energy }, // Set the new energy value
+      { new: true, runValidators: true } // Return updated document & apply schema validation
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({ message: "Energy updated successfully", user });
+  } catch (error) {
+    console.error("Error updating energy:", error);
+    res.status(500).json({ message: "Server Error", error: error.message });
+  }
+};

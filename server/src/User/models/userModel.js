@@ -14,6 +14,12 @@ const userSchema = new mongoose.Schema({
     type: String,
     unique: true,
     required: true
+  },
+  energy:{
+    type:Number,
+    default:100,
+    min:0,
+    max:10000
   }
 });
 
