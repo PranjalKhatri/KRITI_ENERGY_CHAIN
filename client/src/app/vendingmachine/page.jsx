@@ -978,12 +978,12 @@ export default function VendingMachine() {
     }
   };
   // Get past events
-  async function listenForEnergyExchange(callback) {
+/*   async function listenForEnergyExchange(callback) {
     console.log("Listening for EnergyExchanged event...");
     
     console.log(await executeEnergy.getPastEvents("EnergyExchanged"));
 }
-
+ */
 // listenForEnergyExchange((data) => {
 //     console.log("Event Detected:", data);
 // });
