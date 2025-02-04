@@ -9,6 +9,33 @@ const CONTRACT_ABI = [
 	{
 		"inputs": [
 			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "buyEnergyFromDSO",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "depositFunds",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "executeEnergyExchange",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
 				"internalType": "address",
 				"name": "_closedBidAddress",
 				"type": "address"
@@ -23,42 +50,54 @@ const CONTRACT_ABI = [
 		"type": "constructor"
 	},
 	{
-		"inputs": [],
-		"name": "DSO",
-		"outputs": [
+		"anonymous": false,
+		"inputs": [
 			{
-				"internalType": "address payable",
-				"name": "",
+				"indexed": true,
+				"internalType": "address",
+				"name": "producer",
 				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "consumer",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "price",
+				"type": "uint256"
 			}
 		],
-		"stateMutability": "view",
+		"name": "EnergyExchanged",
+		"type": "event"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "sellEnergyToDSO",
+		"outputs": [],
+		"stateMutability": "payable",
 		"type": "function"
 	},
 	{
 		"inputs": [],
-		"name": "DSOETHBalance",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "DSOEnergy",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
+		"name": "withdrawFunds",
+		"outputs": [],
+		"stateMutability": "payable",
 		"type": "function"
 	},
 	{
@@ -78,19 +117,6 @@ const CONTRACT_ABI = [
 			}
 		],
 		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			}
-		],
-		"name": "buyEnergyFromDSO",
-		"outputs": [],
-		"stateMutability": "payable",
 		"type": "function"
 	},
 	{
@@ -127,9 +153,41 @@ const CONTRACT_ABI = [
 	},
 	{
 		"inputs": [],
-		"name": "depositFunds",
-		"outputs": [],
-		"stateMutability": "payable",
+		"name": "DSO",
+		"outputs": [
+			{
+				"internalType": "address payable",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "DSOEnergy",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "DSOETHBalance",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -149,13 +207,6 @@ const CONTRACT_ABI = [
 			}
 		],
 		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "executeEnergyExchange",
-		"outputs": [],
-		"stateMutability": "payable",
 		"type": "function"
 	},
 	{
@@ -198,7 +249,7 @@ const CONTRACT_ABI = [
 	},
 	{
 		"inputs": [],
-		"name": "getDSOETHBalance",
+		"name": "getDSOEnergy",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -211,7 +262,7 @@ const CONTRACT_ABI = [
 	},
 	{
 		"inputs": [],
-		"name": "getDSOEnergy",
+		"name": "getDSOETHBalance",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -318,19 +369,6 @@ const CONTRACT_ABI = [
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			}
-		],
-		"name": "sellEnergyToDSO",
-		"outputs": [],
-		"stateMutability": "payable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
 			}
@@ -360,17 +398,10 @@ const CONTRACT_ABI = [
 		],
 		"stateMutability": "view",
 		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "withdrawFunds",
-		"outputs": [],
-		"stateMutability": "payable",
-		"type": "function"
 	}
 ];
 
-const CONTRACT_ADDRESS = "0x58D9891E909b15F0c7e0eE94F46Acec2D72b1Ab4";
+const CONTRACT_ADDRESS = "0xB3aDF70F9FC6356968279EDcabFf0300762f279A";
 
 // Initialize Web3 and contract
 const initializeContract = () => {

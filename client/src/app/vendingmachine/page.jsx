@@ -49,6 +49,8 @@ export default function VendingMachine() {
   const [tradingMode, setTradingMode] = useState("p2p"); // "p2p" or "dso"
   const [contractBalance, setContractBalance] = useState(0);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [currentEnergy, setCurrentEnergy] = useState(20);
+
   useEffect(() => {
     getInventoryHandler();
     if (account && web3) {
@@ -575,7 +577,7 @@ export default function VendingMachine() {
       // const proofValid = true;
       if (proofValid) {
         console.log("Proof verified successfully!");
-
+        console.log(isProducer,isProducer.toString(),Boolean(isProducer));
         // Place the bid after successful verification
         const transaction = {
           from: account,
@@ -583,8 +585,9 @@ export default function VendingMachine() {
           data: closebid.methods
             .placeBid(
               amount,
-              web3.utils.toWei(price.toString(), "ether"),
-              Boolean(isProducer)
+              price,
+              // web3.utils.toWei(price.toString(), "ether"),
+              Boolean(isProducer)===true ? 1 : 0
             )
             .encodeABI(),
           gas: 200000,
@@ -694,7 +697,12 @@ export default function VendingMachine() {
         timestamp: new Date().toISOString(),
       },
     ];
-
+    const getEnergyColor = (level) => {
+      if (level >= 75) return "bg-emerald-500";
+      if (level >= 50) return "bg-yellow-500";
+      if (level >= 25) return "bg-orange-500";
+      return "bg-red-500";
+    };
     // Use test transactions if transactions array is empty
     const displayTransactions = transactions;
     // transactions.length > 0 ? transactions : testTransaction;
@@ -774,6 +782,45 @@ export default function VendingMachine() {
             </button>
           </div>
         </div>
+        {/* Energy Status Box */}
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-gray-900">
+              Current Energy Status
+            </h2>
+            {currentEnergy > 20 ? (
+              <Battery
+                className={`h-6 w-6 ${getEnergyColor(
+                  currentEnergy
+                )} bg-transparent`}
+              />
+            ) : (
+              <BatteryCharging className="h-6 w-6 text-red-500 animate-pulse bg-transparent" />
+            )}
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm text-gray-600">
+              <span>Current Level</span>
+              <span className={`font-medium`}>{currentEnergy}%</span>
+            </div>
+            <div className="w-full h-4 bg-gray-200 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${getEnergyColor(
+                  currentEnergy
+                )}`}
+                style={{ width: `${currentEnergy}%` }}
+              />
+            </div>
+            <p className="text-sm text-gray-500 mt-2">
+              {currentEnergy <= 20
+                ? "Low energy level! Consider charging soon."
+                : currentEnergy >= 80
+                ? "Energy level optimal"
+                : "Energy level moderate"}
+            </p>
+          </div>
+        </div>
+
         {/* Transactions Table */}
         <div className="bg-white rounded-xl shadow-lg p-6">
           <h2 className="text-xl font-bold text-gray-900 mb-4">Transactions</h2>
@@ -892,88 +939,34 @@ export default function VendingMachine() {
       setError(err instanceof Error ? err.message : String(err));
     }
   };
-  const executeEnergyExchangeFROMcontract = async () => {
+  const executeEnergyExchangeFromContract = async () => {
     try {
-      const accounts = await web3.eth.getAccounts();
-      const sender = accounts[0];
-
-      // Get the function data for depositFunds
-      const data = executeEnergy.methods.executeEnergyExchange().encodeABI();
-
-      const transaction = {
-        from: sender,
-        to: executeEnergy.options.address,
-        // value: amountInWei,
-        gas: 200000,
-        data: data, // Include the encoded function call data
-      };
-
-      const result = await web3.eth.sendTransaction(transaction);
-      console.log("Transaction hash:", result.transactionHash);
-
-      const contractBalance = await web3.eth.getBalance(
-        executeEnergy.options.address
+      // Log relevant contract state before execution
+      console.log("DSO Address:", await executeEnergy.methods.DSO().call());
+      console.log("DSO Energy:", await executeEnergy.methods.getDSOEnergy().call());
+      console.log(
+        "DSO ETH Balance:",
+        await executeEnergy.methods.getDSOETHBalance().call()
       );
-      console.log("Contract ETH Balance:", contractBalance);
 
-      return result;
+      // Optional: Check specific conditions that might prevent execution
+      const dsoAddress = await executeEnergy.methods.DSO().call();
+      const currentAccount = account; // Your sender account
 
-      // Alternative Method 2: Using sendTransaction with encoded data
-      // const data = executeEnergy.methods.executeEnergyExchange().encodeABI();
-      // const tx = await web3.eth.sendTransaction({
-      //     from: sender,
-      //     to: executeEnergy.options.address,
-      //     gas: 3000000,
-      //     data: data
-      // });
+      console.log("Current Account:", currentAccount);
+      console.log("DSO Address:", dsoAddress);
 
-      // Log events if any were emitted
-      if (tx.events) {
-        if (tx.events.EnergyCleared) {
-          const event = tx.events.EnergyCleared;
-          console.log("Energy Cleared Event:", {
-            producer: event.returnValues.producer,
-            consumer: event.returnValues.consumer,
-            amount: event.returnValues.amount,
-            price: event.returnValues.price,
-          });
-        }
+      // Send the transaction
+      const transaction = await executeEnergy.methods.executeEnergyExchange().send({
+        from: account,
+        gas: await executeEnergy.methods.executeEnergyExchange().estimateGas(),
+      });
 
-        if (tx.events.PaymentProcessed) {
-          const event = tx.events.PaymentProcessed;
-          console.log("Payment Processed Event:", {
-            payer: event.returnValues.payer,
-            receiver: event.returnValues.receiver,
-            amount: event.returnValues.amount,
-            totalCost: event.returnValues.totalCost,
-          });
-        }
-
-        if (tx.events.DSOTransaction) {
-          const event = tx.events.DSOTransaction;
-          console.log("DSO Transaction Event:", {
-            entity: event.returnValues.entity,
-            amount: event.returnValues.amount,
-            price: event.returnValues.price,
-            isSelling: event.returnValues.isSelling,
-          });
-        }
-      }
-
-      // Get updated contract state
-      const DSOEnergy = await executeEnergy.methods.getDSOEnergy().call();
-      const DSOBalance = await executeEnergy.methods.getDSOETHBalance().call();
-
-      console.log("Updated DSO Energy:", DSOEnergy);
-      console.log("Updated DSO ETH Balance:", DSOBalance);
-
-      return tx;
+      console.log("Energy exchange executed successfully");
+      console.log("Transaction Hash:", transaction.transactionHash);
+      return transaction;
     } catch (error) {
-      console.error("Error executing energy exchange:", error);
-      if (error.message.includes("revert")) {
-        // Handle specific revert reasons if provided by the contract
-        console.error("Contract reverted:", error.message);
-      }
+      console.error("Full error details:", error);
       throw error;
     }
   };
@@ -1356,7 +1349,7 @@ export default function VendingMachine() {
       >
         withdraw funds
       </button>
-      <button onClick={executeEnergyExchangeFROMcontract}>
+      <button onClick={(e)=>{e.preventDefault();executeEnergyExchangeFromContract()}}>
         EXECUTE ENERGY exchange
       </button>
     </div>
