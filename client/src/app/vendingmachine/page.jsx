@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Web3 from "web3";
+import Web3, { BlockTags } from "web3";
 import {
   RefreshCcw,
   Wallet,
@@ -577,7 +577,7 @@ export default function VendingMachine() {
       // const proofValid = true;
       if (proofValid) {
         console.log("Proof verified successfully!");
-        console.log(isProducer,isProducer.toString(),Boolean(isProducer));
+        console.log(isProducer, isProducer.toString(), Boolean(isProducer));
         // Place the bid after successful verification
         const transaction = {
           from: account,
@@ -587,7 +587,7 @@ export default function VendingMachine() {
               amount,
               price,
               // web3.utils.toWei(price.toString(), "ether"),
-              Boolean(isProducer)===true ? 1 : 0
+              Boolean(isProducer) === true ? 1 : 0
             )
             .encodeABI(),
           gas: 200000,
@@ -943,7 +943,10 @@ export default function VendingMachine() {
     try {
       // Log relevant contract state before execution
       console.log("DSO Address:", await executeEnergy.methods.DSO().call());
-      console.log("DSO Energy:", await executeEnergy.methods.getDSOEnergy().call());
+      console.log(
+        "DSO Energy:",
+        await executeEnergy.methods.getDSOEnergy().call()
+      );
       console.log(
         "DSO ETH Balance:",
         await executeEnergy.methods.getDSOETHBalance().call()
@@ -957,10 +960,14 @@ export default function VendingMachine() {
       console.log("DSO Address:", dsoAddress);
 
       // Send the transaction
-      const transaction = await executeEnergy.methods.executeEnergyExchange().send({
-        from: account,
-        gas: await executeEnergy.methods.executeEnergyExchange().estimateGas(),
-      });
+      const transaction = await executeEnergy.methods
+        .executeEnergyExchange()
+        .send({
+          from: account,
+          gas: await executeEnergy.methods
+            .executeEnergyExchange()
+            .estimateGas(),
+        });
 
       console.log("Energy exchange executed successfully");
       console.log("Transaction Hash:", transaction.transactionHash);
@@ -970,6 +977,19 @@ export default function VendingMachine() {
       throw error;
     }
   };
+  // Get past events
+  async function listenForEnergyExchange(callback) {
+    console.log("Listening for EnergyExchanged event...");
+    
+    console.log(await executeEnergy.getPastEvents("EnergyExchanged"));
+}
+
+// listenForEnergyExchange((data) => {
+//     console.log("Event Detected:", data);
+// });
+// setInterval(() => {
+//   listenForEnergyExchange();
+// }, 5000);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 to-green-100">
@@ -1349,7 +1369,12 @@ export default function VendingMachine() {
       >
         withdraw funds
       </button>
-      <button onClick={(e)=>{e.preventDefault();executeEnergyExchangeFromContract()}}>
+      <button
+        onClick={(e) => {
+          e.preventDefault();
+          executeEnergyExchangeFromContract();
+        }}
+      >
         EXECUTE ENERGY exchange
       </button>
     </div>
