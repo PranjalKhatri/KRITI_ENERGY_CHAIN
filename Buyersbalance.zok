@@ -1,4 +1,4 @@
-def main(field balance, field totalBidCost) -> field {
+def main(field private balance, field private totalBidCost) -> field {
     
     field result = balance >= totalBidCost ? 1 : 0 ;
 
