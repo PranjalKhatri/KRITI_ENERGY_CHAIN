@@ -27,16 +27,9 @@ Moreover, the **IoT sensors** are installed in every energy generation device wh
 - **Privacy-Preserving Technology:** ZK-SNARKs protect confidential transaction data.
 
 ## System Architecture
-### Bidding and Sorting
-The buyers and sellers, that is the prosumers, bid for the amount they want to buy or sell.
-<div>
-   <p align="left">
-   <img src="Contract_Architecture_1.jpg">  
-   </p> 
-   <p align="right">
-      <img src="Contract_Architecture_2.jpg">  
-   </p>
-</div>
+Initial Trading             |  DSO Trading
+:-------------------------:|:-------------------------:
+![](Contract_Architecture_1.jpg)  |  ![](Contract_Architecture_2.jpg)
 
 ### IoT and Smart Meter Integration
 Smart Meter sends meter readings to the server at a fixed time interval using NodeMCU. The system features an alerting system, a home automation unit, a forecasting system and an android application. The data collection unit comprises the power sensor which is used to measure consumption and a module comprising IR Sensors which we use for the home automation system. Firstly, user's consumption acquired by the power sensor is sent to the NodeMCU. The NodeMCU is used to send the data to the cloud. 
