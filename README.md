@@ -1,5 +1,7 @@
 # BarelyTokenized <br> #Take Control of Your Energy
 
+[Demo Video](https://drive.google.com/file/d/1QHKvVlQwnsDzCoNIeCn7VcSn22CsA_Wc/view?usp=sharing)
+
 ## Overview
 The energy sector faces critical challenges, including energy security, energy equity, and environmental sustainability. Traditional energy systems suffer from monopolistic conditions, opaque carbon credit trading, and limited participation of small-scale renewable energy producers.
 
