@@ -1,3 +1,4 @@
+
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
@@ -10,6 +11,8 @@ interface IClosedBid {
 
     function getProducers() external view returns (Participant[] memory);
     function getConsumers() external view returns (Participant[] memory);
+    function removeParticipant(address _bidder) external;
+    function clearParticipants() external;
 }
 
 contract EnergyExchange {
@@ -25,14 +28,19 @@ contract EnergyExchange {
     uint256 public p_buy = 2;
     uint256 public p_sell = 8;
 
-    // **Storage for tracking transactions**
+    // Storage for tracking transactions
     struct Transaction {
         address producer;
         address consumer;
         uint256 amount;
         uint256 price;
     }
-
+    event EnergyExchanged(
+        address indexed producer,
+        address indexed consumer,
+        uint256 amount,
+        uint256 price
+    );
     Transaction[] public successfulTransactions; // Stores all successful transactions
     mapping(address => uint256) public dsoFunctionCalls; // Tracks how many times each address called DSO functions
 
@@ -83,17 +91,79 @@ contract EnergyExchange {
         successfulTransactions.push(Transaction(address(DSO), msg.sender, amount, p_sell));
     }
 
-    function executeEnergyExchange() external payable {
+    // function executeEnergyExchange() external payable {
+    //     IClosedBid.Participant[] memory producers = closedBidContract.getProducers();
+    //     IClosedBid.Participant[] memory consumers = closedBidContract.getConsumers();
+
+    //     _sortAscending(producers);
+    //     _sortDescending(consumers);
+
+    //     uint256 i = 0;
+    //     uint256 j = 0;
+
+    //     while (i < producers.length && j < consumers.length) {
+    //         address payable producer = producers[i].bidder;
+    //         address payable consumer = consumers[j].bidder;
+
+    //         uint256 producerAmount = producers[i].amount;
+    //         uint256 producerPrice = producers[i].price;
+
+    //         uint256 consumerAmount = consumers[j].amount;
+    //         uint256 consumerPrice = consumers[j].price;
+
+    //         if (producerPrice <= consumerPrice) {
+    //             uint256 clearAmount = _min(producerAmount, consumerAmount);
+    //             uint256 clearPrice = (producerPrice + consumerPrice) / 2;
+    //             uint256 totalCost = clearAmount * clearPrice * 1 ether;
+
+    //             // require(balances[consumer] >= totalCost, "Consumer has insufficient funds");
+
+    //             clearedEnergy[producer] += clearAmount;
+    //             clearedEnergy[consumer] += clearAmount;
+
+    //             balances[consumer] -= totalCost;
+    //             balances[producer] += totalCost;
+
+    //             // Store successful transaction
+    //             successfulTransactions.push(Transaction(producer, consumer, clearAmount, clearPrice));
+
+    //             producers[i].amount -= clearAmount;
+    //             consumers[j].amount -= clearAmount;
+
+    //             i++;
+    //             j++;
+    //         } else {
+    //             i++;
+    //             j++;
+    //         }
+    //     }
+
+    //     closedBidContract.clearParticipants();
+    // }
+        function executeEnergyExchange() external {
         IClosedBid.Participant[] memory producers = closedBidContract.getProducers();
         IClosedBid.Participant[] memory consumers = closedBidContract.getConsumers();
+
+        require(producers.length > 0 && consumers.length > 0, "No participants available");
 
         _sortAscending(producers);
         _sortDescending(consumers);
 
         uint256 i = 0;
         uint256 j = 0;
+        uint256 maxIterations = 50; // Prevent infinite loops and excessive gas usage
+        uint256 iterations = 0;
 
-        while (i < producers.length && j < consumers.length) {
+        while (i < producers.length && j < consumers.length && iterations < maxIterations) {
+            if (producers[i].amount == 0) {
+                i++;
+                continue;
+            }
+            if (consumers[j].amount == 0) {
+                j++;
+                continue;
+            }
+
             address payable producer = producers[i].bidder;
             address payable consumer = consumers[j].bidder;
 
@@ -108,7 +178,7 @@ contract EnergyExchange {
                 uint256 clearPrice = (producerPrice + consumerPrice) / 2;
                 uint256 totalCost = clearAmount * clearPrice * 1 ether;
 
-                require(balances[consumer] >= totalCost, "Consumer has insufficient funds");
+                // require(balances[consumer] >= totalCost, "Consumer has insufficient funds");
 
                 clearedEnergy[producer] += clearAmount;
                 clearedEnergy[consumer] += clearAmount;
@@ -116,29 +186,32 @@ contract EnergyExchange {
                 balances[consumer] -= totalCost;
                 balances[producer] += totalCost;
 
-                // Store successful transaction
                 successfulTransactions.push(Transaction(producer, consumer, clearAmount, clearPrice));
+                
+                emit EnergyExchanged(producer, consumer, clearAmount, clearPrice);
 
                 producers[i].amount -= clearAmount;
                 consumers[j].amount -= clearAmount;
-
-                i++;
-                j++;
-            } else {
-                i++;
-                j++;
             }
+            
+            if (producers[i].amount == 0) i++;
+            if (consumers[j].amount == 0) j++;
+            iterations++;
         }
+
+        closedBidContract.clearParticipants();
     }
 
-    function withdrawFunds() external {
+    function withdrawFunds() external payable{
         uint256 balance = balances[msg.sender];
         require(balance > 0, "No funds to withdraw");
         balances[msg.sender] = 0;
         payable(msg.sender).transfer(balance);
+
+        // closedBidContract.removeParticipant(msg.sender);
     }
 
-    // **Getter Functions**
+    // Getter Functions
     function getClearedEnergy(address bidder) external view returns (uint256) {
         return clearedEnergy[bidder];
     }
