@@ -29,6 +29,15 @@ Moreover, the **IoT sensors** are installed in every energy generation device wh
 ## System Architecture
 ### Bidding and Sorting
 The buyers and sellers, that is the prosumers, bid for the amount they want to buy or sell.
+<div>
+   <p align="left">
+   <img src="Contract_Architecture_1.jpg">  
+   </p> 
+   <p align="right">
+      <img src="Contract_Architecture_2.jpg">  
+   </p>
+</div>
+
 ### IoT and Smart Meter Integration
 Smart Meter sends meter readings to the server at a fixed time interval using NodeMCU. The system features an alerting system, a home automation unit, a forecasting system and an android application. The data collection unit comprises the power sensor which is used to measure consumption and a module comprising IR Sensors which we use for the home automation system. Firstly, user's consumption acquired by the power sensor is sent to the NodeMCU. The NodeMCU is used to send the data to the cloud. 
 
@@ -65,6 +74,16 @@ By analyzing sensor data over time, algorithms can predict the availability and 
    - ZK-SNARKs for encrypted transactions
    - Data protection and access control
 
+## Sustainability, Efficiency, and Scalability
+The model promotes renewable energy producers by giving them carbon credits and penalising non-renewable energy producers by taking carbom credits from them. This project contributes to the United Nations **Sustainable Development Goals (SDGs)** by promoting clean energy solutions, transparency, and equitable energy distribution. The following SDGs are directly addressed:
+-  **Goal 7 : Affordable and Clean Energy** – Enabling decentralized renewable energy trading.
+-  **Goal 9: Industry, Innovation, and Infrastructure** – Utilizing blockchain and IoT for smart grids.
+-  **Goal 13: Climate Action** – Supporting verifiable carbon credit trading for sustainability.
+
+We support small scale prosumers by setting a market cap and ensuring that even they get a fair chance to participate and buy energy. This ensures efficient distribution of energy amongst all high scale
+to low scale prosumers.
+
+Profit is ensured when the users bid fair amounts otherwise they go to DSO. This profit of all the users ensure market participation for the users thereby helping the model to scale on a larger level.
 
 ## How to Run the Project
 1. **Install Dependencies for Frontend**
@@ -89,8 +108,3 @@ By analyzing sensor data over time, algorithms can predict the availability and 
 And there should be a .env file in client which should contain NEXT_PUBLIC_API_URL="http://127.0.0.1:7545"
 And there should be a .env file in server which should contain DB_URL=<your_mongo_db_url_test_database> and PORT=8000
 And you should have Ganache running in the background and metamask setup in Ganache
-
-
-
-
-
