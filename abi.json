@@ -1,32 +1,17 @@
 {
   "inputs": [
     {
-      "name": "sellerEnergy",
+      "name": "Carbontoken",
       "public": false,
       "type": "field"
     },
     {
-      "name": "buyerDemand",
-      "public": false,
-      "type": "field"
-    },
-    {
-      "name": "marketCap",
-      "public": false,
+      "name": "selling_energy",
+      "public": true,
       "type": "field"
     }
   ],
   "output": {
-    "type": "tuple",
-    "components": {
-      "elements": [
-        {
-          "type": "field"
-        },
-        {
-          "type": "field"
-        }
-      ]
-    }
+    "type": "field"
   }
 }

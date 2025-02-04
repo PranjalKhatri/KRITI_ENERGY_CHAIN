@@ -1,0 +1,7 @@
+def main(private field Carbontoken , field selling_energy ) -> field {
+
+     field res = selling_energy <= Carbontoken ? 1 : 0 ;
+
+    return res ;
+
+}
