@@ -20,6 +20,7 @@ import vmContract from "../../../blockchain/firstcontract";
 import closebid from "../../../blockchain/closebid";
 import executeEnergy from "../../../blockchain/executeEnergy";
 import buyersBalance from "../../../blockchain/buyersBalance";
+import energyReserve from "../../../blockchain/energyReserve";
 import { initialize } from "zokrates-js";
 import axios from "axios";
 import { loadProvingKey, loadArtifacts } from "./artifactLoader";
@@ -216,14 +217,13 @@ export default function VendingMachine() {
       return false; // If there's an error, return false
     }
   };
-
-  const energyReserveVerifier = async (balance, totalBidCost) => {
+  const energyReserveVerifier = async (sellerReserve, sellingAmount) => {
     try {
       // Initialize ZoKrates provider
       const zokratesProvider = await initialize();
 
-      const artifacts = await loadArtifacts("buyersbalance/Buyersbalance_out");
-      const provingKey = await loadProvingKey("buyersbalance/proving.key");
+      const artifacts = await loadArtifacts("energyReserve/energyreserve_out");
+      const provingKey = await loadProvingKey("energyReserve/energyreserve_proving.key");
 
       if (!artifacts || !provingKey) {
         console.error("Failed to load artifacts or proving key.");
@@ -232,15 +232,17 @@ export default function VendingMachine() {
 
       console.log("Artifacts:", artifacts);
       console.log("Proving Key:", provingKey);
-
+      console.log("params",""+sellerReserve, ""+sellingAmount);
       // Compute witness
       const { witness, output } = await zokratesProvider.computeWitness(
         artifacts,
-        [balance, totalBidCost]
+        [sellerReserve, sellingAmount]
       );
       console.log("Witness:", witness);
       console.log("Output:", output);
-
+      console.log("output int ",typeof output);
+      // console.log("ouptut at pos ",output[0],"1",output[1],"2",output[2],"3",output[3],"4",output[4],"5",output[5]);
+      if (output[5] === "0") return false; // Ensures valid comparison
       // Generate proof using the proving key
       const proof = await zokratesProvider.generateProof(
         artifacts.program,
@@ -250,37 +252,13 @@ export default function VendingMachine() {
       console.log("Generated Proof:", proof);
 
       // Get the buyersBalance contract instance (Make sure this contract is already imported)
-      const buyersBalanceContract = buyersBalance; // Assuming buyersBalance is already imported
-
-      // Estimate gas for verifying the proof
-      const gasPrice = await web3.eth.getGasPrice();
-      console.log("Current gas price:", gasPrice);
-
-      const balance_ = await web3.eth.getBalance(account);
-      console.log(
-        "Account balance:",
-        web3.utils.fromWei(balance_, "ether"),
-        "ETH"
-      );
-
-      // Estimate gas for the transaction
-      const gasEstimate = await buyersBalanceContract.methods
-        .verifyTx(proof.proof, proof.inputs)
-        .estimateGas({ from: account });
-
-      console.log("Estimated gas:", gasEstimate);
-
-      // Add buffer to gas estimate
-      const gasLimit = Math.ceil(Number(gasEstimate) * 1.2); // 20% buffer
-      const totalCost = BigInt(gasPrice) * BigInt(gasLimit);
-      console.log("Total gas cost in wei:", totalCost.toString());
-
+      const energyReserveVerifierContract = energyReserve; // Assuming buyersBalance is already imported
       // Verify proof transaction
-      const result = await buyersBalanceContract.methods
+      const result = await energyReserveVerifierContract.methods
         .verifyTx(proof.proof, proof.inputs)
         .call({ from: account });
 
-      console.log("Proof verification result:", result);
+      console.log("Proof verification result Seller:", result);
       return result; // Return the result of the proof verification (true/false)
     } catch (error) {
       console.error("Error verifying proof:", error);
@@ -311,6 +289,9 @@ export default function VendingMachine() {
       console.log("Error in user (duplication probably)");
       console.error(err);
     }
+    const resp = await axios.get(`http://localhost:8000/api/v1/users/${userId}`);
+    setCurrentEnergy(resp.data.energy);
+    console.log(resp);
     try {
       // 🔹 Fetch transactions for the user
       const response = await axios.get(
@@ -573,6 +554,9 @@ export default function VendingMachine() {
           walletBalanceWei,
           totalBidCostWei
         );
+      }else{
+        console.log("starting proof verification for seller using ZK");
+        proofValid = await energyReserveVerifier(currentEnergy.toString(),amount.toString());
       }
       // const proofValid = true;
       if (proofValid) {
