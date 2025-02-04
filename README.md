@@ -31,6 +31,22 @@ Initial Trading             |  DSO Trading
 :-------------------------:|:-------------------------:
 ![](Contract_Architecture_1.jpg)  |  ![](Contract_Architecture_2.jpg)
 
+### Bidding and Sorting
+The buyers and sellers, that is the prosumers, bid for the amount they want to buy or sell.
+We will first verify buyer's balance and seller's reserve using **ZK-SNARKS** 
+Now we form an array of buyers and sellers and then sort sellers' array in ascending order of their prices while buyers' array in descending order of their prices.
+
+### Model Implementation
+Now we iterate in both the array using a pointer in each of them. We set a market cap which restricts the amount that a buyer can buy and seller can sell in a particular round.
+No of round is the number of times we iterate the array. 
+The value of the cap is set dynamically in each round which is equal to the median of the array of amount of energy traded.
+
+We move both the pointers simultaneously and transfer takes place only when the seller's price is less than or equal to the buyer's price set the price to be the mean of the buyer's price and the seller's price and the amount of energy traded is equal to the minumum of the market cap, buyer's amount & seller's amount.
+The round ends when we reach a particular point when the above mentioned condition cannot be met in any way or any one of the array of the buyer's amount or seller's amount becomes empty.
+
+Now, the users get the option to buy or sell their amount from DSO(Distribution System Office) which acts an aggregator in our model. DSO is an address which acts as a special node.
+The price at which DSO buys energy is less than the minimum of the seller's price array and the price at which DSO sells energy would be greater than the maximum of the buyer's price array.
+
 ### IoT and Smart Meter Integration
 Smart Meter sends meter readings to the server at a fixed time interval using NodeMCU. The system features an alerting system, a home automation unit, a forecasting system and an android application. The data collection unit comprises the power sensor which is used to measure consumption and a module comprising IR Sensors which we use for the home automation system. Firstly, user's consumption acquired by the power sensor is sent to the NodeMCU. The NodeMCU is used to send the data to the cloud. 
 
@@ -51,6 +67,10 @@ These values along with the consumption data are sent to the NodeMCU connected t
 IoT sensors on solar panels can monitor sunlight exposure, temperature, and power generation, allowing for clear identification of a renewable source like solar energy. For wind energy, sensors can measure wind speed and direction, signifying a renewable source like wind power. Water flow and pressure sensors can monitor the source of hydropower, which is considered renewable. Temperature sensors can indicate the presence of geothermal energy, another renewable source. 
   
 By analyzing sensor data over time, algorithms can predict the availability and consistency of an energy source, helping distinguish between renewable (fluctuating but replenished) and non-renewable (finite) sources. If the energy source shows consistent fluctuations based on natural cycles (like sunlight or wind), it is likely renewable. This helps to seperate the producers into renewable and non-renewable.  
+
+### ZK-SNARKS Integration
+We have used multiple functions such as BuyersBalance.zok, EnergyReserve.zok, CCTVverify.zok to verify whether buyer has enough money to make the transaction, seller has enough energy to tranfer(IoT),
+smooth trade and availbility of Carbon Credits without exposing the data to other users enhancing the privacy and security of the transactions. 
 
 ## System Components
 1. **Blockchain Layer**
@@ -76,7 +96,16 @@ The model promotes renewable energy producers by giving them carbon credits and 
 We support small scale prosumers by setting a market cap and ensuring that even they get a fair chance to participate and buy energy. This ensures efficient distribution of energy amongst all high scale
 to low scale prosumers.
 
-Profit is ensured when the users bid fair amounts otherwise they go to DSO. This profit of all the users ensure market participation for the users thereby helping the model to scale on a larger level.
+Profit is ensured when the users bid fair amounts otherwise they go to DSO. This profit of all the users ensure market participation for the users thereby helping the model to scale on a larger level. 
+ZK-SNARKS helps make the transactions smoother, faster & secure on a larger scale. When traffic is high, transactions could take upto ten minutes to verify.
+
+## Tech-Stacks Used
+- Solidity
+- ZoKrates
+- Next.js
+- MongoDB
+- Tailwind CSS
+- Python
 
 ## How to Run the Project
 1. **Install Dependencies for Frontend**
